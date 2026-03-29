@@ -1,20 +1,16 @@
 """Protocol encode / decode layer for the FNIRSI DPS-150.
 
-.. note::
-    This module will grow as the serial protocol is reverse-engineered.
-    See ``docs/protocol/`` for the current state of the RE effort.
-
-Frame structure (hypothesis – update as RE progresses)
--------------------------------------------------------
+Frame format (CONFIRMED 2026-03-29 from USB capture):
 
 .. code-block:: text
 
-    +--------+--------+--------+  ...  +--------+----------+
-    | START  |  CMD   | LENGTH |  DATA | CHKSUM |  STOP    |
-    | 1 byte | 1 byte | 1 byte | N byte| 1 byte | 1 byte   |
-    +--------+--------+--------+  ...  +--------+----------+
+    [START] [CMD] [LEN] [DATA × LEN] [CHKSUM]
 
-All multi-byte integers: big-endian unless noted otherwise.
+    START  : 0xa1 query/response  |  0xb1 write  |  0xc1 connect/disconnect
+    CHKSUM : (CMD + LEN + Σ DATA bytes) mod 256
+    Values : IEEE 754 32-bit little-endian float for voltage and current
+
+See ``docs/protocol/`` for full command catalogue and RE notes.
 """
 
 from __future__ import annotations
@@ -25,48 +21,83 @@ from dataclasses import dataclass, field
 from fnirsi_ps_control.exceptions import ChecksumError, ProtocolError
 
 # ---------------------------------------------------------------------------
-# Frame constants – adjust to match real captures
+# Start bytes
 # ---------------------------------------------------------------------------
-FRAME_START: int = 0xAA   # TBD
-FRAME_STOP: int = 0x55    # TBD
-MIN_FRAME_LEN: int = 5    # start + cmd + length + checksum + stop
+START_QUERY: int = 0xA1    # read / query from host; ALL device responses
+START_WRITE: int = 0xB1    # write / set command from host
+START_CTRL:  int = 0xC1    # connect / disconnect
+
+# ---------------------------------------------------------------------------
+# Command IDs  (confirmed from capture unless noted)
+# ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# Command IDs – extend as commands are discovered
-# ---------------------------------------------------------------------------
 class Cmd:
-    """Known command identifiers."""
+    """Known command identifiers (all confirmed from 2026-03-29 capture)."""
 
-    GET_STATUS: int = 0x01     # TBD
-    SET_VOLTAGE: int = 0x02    # TBD
-    SET_CURRENT: int = 0x03    # TBD
-    SET_OUTPUT: int = 0x04     # TBD
+    # Connection control
+    CONNECT_CTRL:    int = 0x00   # START=0xc1; DATA=01 connect, 00 disconnect
+
+    # Host reads (query + response, START=0xa1 both directions)
+    GET_READY:       int = 0xE1   # response: uint8 (0x01 = ready)
+    GET_DEVICE_NAME: int = 0xDE   # response: ASCII "DPS-150"
+    GET_HW_VERSION:  int = 0xE0   # response: ASCII "V1.2"
+    GET_FW_VERSION:  int = 0xDF   # response: ASCII "V1.0"
+    GET_FULL_STATUS: int = 0xFF   # response: 139-byte blob
+
+    # Host writes (START=0xb1)
+    SET_VOLTAGE:     int = 0xC1   # DATA: float32 LE [V]
+    SET_CURRENT:     int = 0xC2   # DATA: float32 LE [A]
+
+    # Periodic device push (~600 ms, unsolicited, START=0xa1)
+    PUSH_OUTPUT:     int = 0xC3   # 3 × float32: Vout[V], Iout[A], ?
+    PUSH_VIN_A:      int = 0xC0   # float32: Vin channel A [V] (~20.1 V)
+    PUSH_VIN_B:      int = 0xE2   # float32: Vin channel B [V] (~19.9 V)
+    PUSH_MAX_I_REF:  int = 0xE3   # float32: always 5.1 A (max current constant)
+    PUSH_VIN_C:      int = 0xC4   # float32: ~23.67 V (TBD – Vin2 or boost rail)
 
 
 # ---------------------------------------------------------------------------
-# Data classes
+# Checksum
 # ---------------------------------------------------------------------------
+
+def _checksum(cmd: int, length: int, data: bytes) -> int:
+    """Compute frame checksum: (CMD + LEN + Σ DATA) mod 256."""
+    return (cmd + length + sum(data)) & 0xFF
+
+
+# ---------------------------------------------------------------------------
+# Generic Frame
+# ---------------------------------------------------------------------------
+
 @dataclass
 class Frame:
-    """Represents a single protocol frame."""
+    """One application-layer frame."""
 
+    start: int
     cmd: int
     data: bytes = field(default=b"")
+
+    # ------------------------------------------------------------------
+    # Encode
+    # ------------------------------------------------------------------
 
     def encode(self) -> bytes:
         """Serialise this frame to bytes ready for transmission."""
         length = len(self.data)
-        checksum = _checksum(bytes([self.cmd, length]) + self.data)
+        chk = _checksum(self.cmd, length, self.data)
         return struct.pack(
-            f"BBB{length}sBB",
-            FRAME_START,
+            f"BBB{length}sB",
+            self.start,
             self.cmd,
             length,
             self.data,
-            checksum,
-            FRAME_STOP,
+            chk,
         )
+
+    # ------------------------------------------------------------------
+    # Decode
+    # ------------------------------------------------------------------
 
     @classmethod
     def decode(cls, raw: bytes) -> "Frame":
@@ -75,78 +106,101 @@ class Frame:
         Raises
         ------
         ProtocolError
-            If the frame boundaries or length are invalid.
+            Frame too short or length field inconsistent.
         ChecksumError
-            If the checksum does not match.
+            Checksum does not match.
         """
-        if len(raw) < MIN_FRAME_LEN:
-            raise ProtocolError(f"Frame too short: {len(raw)} bytes")
-        if raw[0] != FRAME_START:
-            raise ProtocolError(f"Unexpected start byte: 0x{raw[0]:02X}")
-        if raw[-1] != FRAME_STOP:
-            raise ProtocolError(f"Unexpected stop byte: 0x{raw[-1]:02X}")
+        if len(raw) < 4:
+            raise ProtocolError(f"Frame too short: {len(raw)} bytes (min 4)")
 
-        cmd = raw[1]
+        start  = raw[0]
+        cmd    = raw[1]
         length = raw[2]
 
-        if len(raw) != MIN_FRAME_LEN + length:
+        expected_total = 4 + length   # start + cmd + len + data + chk
+        if len(raw) < expected_total:
             raise ProtocolError(
-                f"Length field ({length}) does not match frame size ({len(raw)})"
+                f"Frame truncated: have {len(raw)} bytes, need {expected_total}"
             )
 
-        data = raw[3 : 3 + length]
-        received_chk = raw[3 + length]
-        expected_chk = _checksum(bytes([cmd, length]) + data)
+        data    = raw[3 : 3 + length]
+        got_chk = raw[3 + length]
+        exp_chk = _checksum(cmd, length, data)
 
-        if received_chk != expected_chk:
+        if got_chk != exp_chk:
             raise ChecksumError(
-                f"Checksum mismatch: got 0x{received_chk:02X}, expected 0x{expected_chk:02X}"
+                f"Checksum mismatch: got 0x{got_chk:02X}, expected 0x{exp_chk:02X}"
             )
 
-        return cls(cmd=cmd, data=data)
+        return cls(start=start, cmd=cmd, data=data)
 
 
 # ---------------------------------------------------------------------------
-# Payload helpers
+# TX frame builders
 # ---------------------------------------------------------------------------
-def encode_set_voltage(millivolts: int) -> Frame:
+
+def encode_connect() -> Frame:
+    """Build a CONNECT request frame."""
+    return Frame(start=START_CTRL, cmd=Cmd.CONNECT_CTRL, data=b"\x01")
+
+
+def encode_disconnect() -> Frame:
+    """Build a DISCONNECT request frame."""
+    return Frame(start=START_CTRL, cmd=Cmd.CONNECT_CTRL, data=b"\x00")
+
+
+def encode_set_voltage(volts: float) -> Frame:
     """Build a SET_VOLTAGE frame.
 
     Parameters
     ----------
-    millivolts:
-        Target voltage in millivolts (e.g. 12000 for 12 V).
+    volts:
+        Target voltage in **volts** (e.g. ``10.0``). Sent as float32 LE.
     """
-    return Frame(cmd=Cmd.SET_VOLTAGE, data=struct.pack(">I", millivolts))
+    return Frame(start=START_WRITE, cmd=Cmd.SET_VOLTAGE, data=struct.pack("<f", volts))
 
 
-def encode_set_current(milliamps: int) -> Frame:
+def encode_set_current(amps: float) -> Frame:
     """Build a SET_CURRENT frame.
 
     Parameters
     ----------
-    milliamps:
-        Current limit in milliamps (e.g. 1000 for 1 A).
+    amps:
+        Current limit in **amps** (e.g. ``1.0``). Sent as float32 LE.
     """
-    return Frame(cmd=Cmd.SET_CURRENT, data=struct.pack(">I", milliamps))
+    return Frame(start=START_WRITE, cmd=Cmd.SET_CURRENT, data=struct.pack("<f", amps))
 
 
-def encode_set_output(enabled: bool) -> Frame:
-    """Build an OUTPUT ON/OFF frame."""
-    return Frame(cmd=Cmd.SET_OUTPUT, data=bytes([0x01 if enabled else 0x00]))
-
-
-def encode_get_status() -> Frame:
-    """Build a GET_STATUS request frame."""
-    return Frame(cmd=Cmd.GET_STATUS)
+def encode_query(cmd: int) -> Frame:
+    """Build a generic read-request frame (DATA = 0x00)."""
+    return Frame(start=START_QUERY, cmd=cmd, data=b"\x00")
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# RX payload parsers
 # ---------------------------------------------------------------------------
-def _checksum(data: bytes) -> int:
-    """Simple XOR checksum – update to match real device checksum algorithm."""
-    result = 0
-    for byte in data:
-        result ^= byte
-    return result
+
+def decode_f32(data: bytes) -> float:
+    """Decode a 4-byte little-endian float32 payload."""
+    if len(data) < 4:
+        raise ProtocolError(f"Expected 4 bytes for float32, got {len(data)}")
+    return float(struct.unpack_from("<f", data)[0])
+
+
+def decode_string(data: bytes) -> str:
+    """Decode an ASCII string payload (no NUL terminator)."""
+    return data.decode("ascii")
+
+
+def decode_push_output(data: bytes) -> tuple[float, float, float]:
+    """Decode CMD 0xc3 periodic output measurement.
+
+    Returns
+    -------
+    tuple
+        ``(vout_V, iout_A, unknown)`` — all 0.0 when output is disabled.
+    """
+    if len(data) < 12:
+        raise ProtocolError(f"CMD_PUSH_OUTPUT: expected 12 bytes, got {len(data)}")
+    vout, iout, unknown = struct.unpack_from("<fff", data)
+    return float(vout), float(iout), float(unknown)
