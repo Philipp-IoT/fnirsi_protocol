@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (ruff + mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # full history so hatch-vcs can read git tags
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dev dependencies
+        run: uv sync --extra dev
+
+      - name: ruff – format check
+        run: uv run ruff format --check src tests
+
+      - name: ruff – lint
+        run: uv run ruff check src tests
+
+      - name: mypy
+        run: uv run mypy
+
+  # ---------------------------------------------------------------------------
+  # Test matrix
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run tests
+        run: uv run pytest --cov=fnirsi_ps_control --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+
+  # ---------------------------------------------------------------------------
+  # Semantic release (main branch only, not PRs)
+  #
+  # python-semantic-release analyses conventional commits since the last tag,
+  # determines the next SemVer bump, creates the annotated git tag + CHANGELOG
+  # entry + GitHub Release.  hatch-vcs reads that tag when building the wheel.
+  #
+  # Conventional commit → version bump:
+  #   feat:              minor  (0.x: patch while major_on_zero = false)
+  #   fix / perf:        patch
+  #   BREAKING CHANGE:   major  (0.x: minor while major_on_zero = false)
+  # ---------------------------------------------------------------------------
+  release:
+    name: Semantic Release
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    concurrency: release   # prevent parallel releases racing on the same commit
+
+    permissions:
+      contents: write      # push tag + create GitHub Release
+      id-token: write      # required by some PSR internals
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          # Use a PAT or the default GITHUB_TOKEN.
+          # GITHUB_TOKEN is enough for creating releases; use a PAT if you
+          # need the release commit to re-trigger other workflows.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dev dependencies
+        run: uv sync --extra dev
+
+      - name: Run semantic-release
+        id: semrel
+        # 'version' bumps, commits, tags and creates the GitHub Release.
+        # No PyPI publishing – that step is intentionally omitted.
+        run: uv run semantic-release version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build wheel & sdist
+        # Only build if a new version was actually released.
+        if: steps.semrel.conclusion == 'success'
+        run: uv build
+
+      - name: Upload dist assets to GitHub Release
+        if: steps.semrel.conclusion == 'success'
+        # Attach the built wheel + sdist to the release created above.
+        run: uv run semantic-release publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

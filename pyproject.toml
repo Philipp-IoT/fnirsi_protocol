@@ -1,6 +1,6 @@
 [project]
 name = "fnirsi-ps-control"
-version = "0.1.0"
+dynamic = ["version"]
 description = "PC control library and CLI for the FNIRSI DPS-150 regulated power supply"
 readme = "README.md"
 license = { text = "MIT" }
@@ -30,22 +30,36 @@ dev = [
   "ruff>=0.4",
   "mypy>=1.10",
   "types-pyserial",
+  "python-semantic-release>=9",
 ]
 
 [project.scripts]
 fnirsi = "fnirsi_ps_control.cli:app"
 
 [project.urls]
-Homepage = "https://gitlab.com/yourname/fnirsi_ps_control"
-Repository = "https://gitlab.com/yourname/fnirsi_ps_control"
-"Issue Tracker" = "https://gitlab.com/yourname/fnirsi_ps_control/-/issues"
+Homepage = "https://github.com/yourname/fnirsi_ps_control"
+Repository = "https://github.com/yourname/fnirsi_ps_control"
+"Issue Tracker" = "https://github.com/yourname/fnirsi_ps_control/issues"
+Changelog = "https://github.com/yourname/fnirsi_ps_control/releases"
 
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+# Follows PEP 440 / SemVer via git tags (e.g. v1.2.3).
+# Local dev installs get a version like 0.1.0.dev3+gabcdef.
+version_scheme = "python-simplified-semver"
+local_scheme = "no-local-version"    # keeps PyPI-uploadable versions clean
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/fnirsi_ps_control/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fnirsi_ps_control"]
@@ -82,3 +96,37 @@ files = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=fnirsi_ps_control --cov-report=term-missing"
+
+# ---------------------------------------------------------------------------
+# python-semantic-release
+# ---------------------------------------------------------------------------
+[tool.semantic_release]
+# Version is managed exclusively through annotated git tags (e.g. v1.2.3).
+# hatch-vcs reads the same tags at build time, so no version string lives
+# anywhere in the source tree.
+version_source = "tag"
+tag_format = "v{version}"
+commit_message = "chore(release): v{version} [skip ci]"
+major_on_zero = false          # 0.x bumps: breaking → minor, feat/fix → patch
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.commit_parser_options]
+# Conventional Commits → SemVer mapping
+# feat:         minor bump
+# fix / perf:   patch bump
+# BREAKING CHANGE or '!': major bump
+allowed_tags = ["feat", "fix", "perf", "refactor", "docs", "style", "test", "chore", "ci", "build", "revert"]
+minor_tags   = ["feat"]
+patch_tags   = ["fix", "perf"]
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+  "^chore\\(release\\)",   # skip the release commit itself
+  "^chore",
+  "^ci",
+  "^style",
+  "^test",
+]

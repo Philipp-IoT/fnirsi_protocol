@@ -9,7 +9,7 @@
 ## Clone and Install
 
 ```sh
-git clone https://gitlab.com/yourname/fnirsi_ps_control.git
+git clone https://github.com/yourname/fnirsi_ps_control.git
 cd fnirsi_ps_control
 
 # Install all runtime + dev dependencies into a managed .venv
@@ -78,3 +78,49 @@ kaitai-struct-compiler --target python \
 ```
 
 Compiled output is git-ignored; re-generate as needed.
+
+## Semantic Versioning
+
+The package version is derived automatically from **git tags** via
+[`hatch-vcs`](https://github.com/ofek/hatch-vcs). You never edit a version
+string manually. Tags are created automatically by
+[`python-semantic-release`](https://python-semantic-release.readthedocs.io/)
+in CI based on **Conventional Commit** messages.
+
+### Commit message format
+
+```
+<type>[(scope)][!]: <short description>
+
+[optional body]
+
+[optional footer: BREAKING CHANGE: ...]
+```
+
+| Commit prefix | SemVer bump |
+|---------------|-------------|
+| `feat:` | minor (`0.x → 0.x+1`) |
+| `fix:`, `perf:` | patch (`0.x.y → 0.x.y+1`) |
+| `feat!:` / `BREAKING CHANGE` footer | major (`x → x+1`) |
+| `chore:`, `ci:`, `docs:`, `style:`, `test:` | no release |
+
+### How releases happen
+
+1. Merge a PR into `main` with conventional commits.
+2. The CI `release` job runs `semantic-release version` which:
+   - reads all commits since the last tag
+   - determines the next version
+   - creates an annotated git tag (`v1.2.3`)
+   - generates a CHANGELOG entry
+   - creates a GitHub Release
+3. The wheel is built with `uv build` (hatch-vcs reads the new tag).
+4. The wheel is attached to the GitHub Release via `semantic-release publish`.
+
+### Local version inspection
+
+```sh
+uv run python -c "import fnirsi_ps_control; print(fnirsi_ps_control.__version__)"
+
+# Preview what the next release version would be (dry-run):
+uv run semantic-release version --print
+```

@@ -10,6 +10,9 @@ dist/
 build/
 .eggs/
 
+# hatch-vcs generated version file (re-created at every build / editable install)
+src/fnirsi_ps_control/_version.py
+
 # uv
 .venv/
 .uv/

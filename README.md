@@ -2,10 +2,11 @@
 
 > PC control library &amp; CLI for the **FNIRSI DPS-150** regulated power supply via USB CDC (virtual COM port).
 
-[![pipeline status](https://gitlab.com/yourname/fnirsi_ps_control/badges/main/pipeline.svg)](https://gitlab.com/yourname/fnirsi_ps_control/-/pipelines)
-[![coverage report](https://gitlab.com/yourname/fnirsi_ps_control/badges/main/coverage.svg)](https://gitlab.com/yourname/fnirsi_ps_control/-/commits/main)
+[![CI](https://github.com/yourname/fnirsi_ps_control/actions/workflows/ci.yml/badge.svg)](https://github.com/yourname/fnirsi_ps_control/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/badge/coverage-see_CI-brightgreen)](https://github.com/yourname/fnirsi_ps_control/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![GitHub release](https://img.shields.io/github/v/release/yourname/fnirsi_ps_control)](https://github.com/yourname/fnirsi_ps_control/releases)
 
 ---
 
