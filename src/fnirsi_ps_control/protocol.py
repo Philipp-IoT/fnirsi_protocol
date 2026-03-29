@@ -1,14 +1,20 @@
 """Protocol encode / decode layer for the FNIRSI DPS-150.
 
-Frame format (CONFIRMED 2026-03-29 from USB capture):
+Wire format (CONFIRMED 2026-03-29 from Windows USBPcap capture):
 
 .. code-block:: text
 
-    [START] [CMD] [LEN] [DATA × LEN] [CHKSUM]
+    [DIR] [START] [CMD] [LEN] [DATA × LEN] [CHKSUM]
 
+    DIR    : 0xf1 host→device  |  0xf0 device→host
     START  : 0xa1 query/response  |  0xb1 write  |  0xc1 connect/disconnect
-    CHKSUM : (CMD + LEN + Σ DATA bytes) mod 256
+    CHKSUM : (CMD + LEN + Σ DATA bytes) mod 256  (DIR and START excluded)
     Values : IEEE 754 32-bit little-endian float for voltage and current
+
+The DIR byte is a direction prefix that is part of the serial data stream.
+It is NOT a USB-layer artefact (confirmed: USBPcap captures raw bulk
+payloads; every TX frame in the pcapng starts with ``0xf1``, every RX
+with ``0xf0``).
 
 See ``docs/protocol/`` for full command catalogue and RE notes.
 """
@@ -21,11 +27,23 @@ from dataclasses import dataclass, field
 from fnirsi_ps_control.exceptions import ChecksumError, ProtocolError
 
 # ---------------------------------------------------------------------------
+# Direction prefixes (part of the wire protocol, NOT USB-layer artefacts)
+# ---------------------------------------------------------------------------
+DIR_TX: int = 0xF1    # host → device  (prepended to every TX frame)
+DIR_RX: int = 0xF0    # device → host  (first byte of every RX frame)
+
+# ---------------------------------------------------------------------------
 # Start bytes
 # ---------------------------------------------------------------------------
 START_QUERY: int = 0xA1    # read / query from host; ALL device responses
 START_WRITE: int = 0xB1    # write / set command from host
 START_CTRL:  int = 0xC1    # connect / disconnect
+
+# Opaque 5-byte magic sent by the manufacturer tool after the READY handshake
+# in every captured session.  START=0xb0, but checksum does NOT follow the
+# standard algorithm (expected 0x02, observed 0x01).  Sent as raw bytes
+# (the DIR_TX prefix is added by the transport layer).
+START_SESSION_MAGIC: bytes = b"\xb0\x00\x01\x01\x01"
 
 # ---------------------------------------------------------------------------
 # Command IDs  (confirmed from capture unless noted)
@@ -101,7 +119,7 @@ class Frame:
     # ------------------------------------------------------------------
 
     @classmethod
-    def decode(cls, raw: bytes) -> "Frame":
+    def decode(cls, raw: bytes) -> Frame:
         """Parse *raw* bytes into a :class:`Frame`.
 
         Raises
@@ -188,6 +206,23 @@ def encode_output_disable() -> Frame:
     Device echoes back with START=0xa1.
     """
     return Frame(start=START_WRITE, cmd=Cmd.SET_OUTPUT, data=b"\x00")
+
+
+def encode_set_output(enabled: bool) -> Frame:
+    """Build a SET_OUTPUT frame.
+
+    Convenience wrapper for :func:`encode_output_enable` /
+    :func:`encode_output_disable`.
+    """
+    return encode_output_enable() if enabled else encode_output_disable()
+
+
+def encode_get_status() -> Frame:
+    """Build a GET_FULL_STATUS query frame (CMD 0xff).
+
+    The device responds with a 139-byte blob (CMD 0xff, START 0xa1).
+    """
+    return encode_query(Cmd.GET_FULL_STATUS)
 
 
 def encode_query(cmd: int) -> Frame:

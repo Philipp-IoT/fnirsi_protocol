@@ -9,8 +9,8 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from fnirsi_ps_control.device import DPS150
 from fnirsi_ps_control import __version__
+from fnirsi_ps_control.device import DPS150
 
 app = typer.Typer(
     name="fnirsi",
@@ -29,7 +29,7 @@ PortArg = Annotated[
 ]
 BaudArg = Annotated[
     int,
-    typer.Option("--baudrate", "-b", help="Baud rate."),
+    typer.Option("--baudrate", "-b", help="Baud rate (default: 9600)."),
 ]
 
 # ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ def version() -> None:
 @app.command()
 def info(
     port: PortArg,
-    baudrate: BaudArg = 115200,
+    baudrate: BaudArg = 9600,
 ) -> None:
     """Query and display the current device status."""
     with DPS150(port=port, baudrate=baudrate) as ps:
@@ -56,11 +56,11 @@ def info(
     table.add_column("Parameter", style="bold")
     table.add_column("Value")
 
-    table.add_row("Voltage (set)", f"{status.voltage_set_mv / 1000:.3f} V")
-    table.add_row("Voltage (measured)", f"{status.voltage_meas_mv / 1000:.3f} V")
-    table.add_row("Current (limit)", f"{status.current_set_ma / 1000:.3f} A")
-    table.add_row("Current (measured)", f"{status.current_meas_ma / 1000:.3f} A")
-    table.add_row("Power (measured)", f"{status.power_mw / 1000:.3f} W")
+    table.add_row("Voltage (set)", f"{status.voltage_set_v:.3f} V")
+    table.add_row("Voltage (measured)", "n/a (use PUSH_OUTPUT stream)")
+    table.add_row("Current (limit)", f"{status.current_set_a:.3f} A")
+    table.add_row("Current (measured)", "n/a (use PUSH_OUTPUT stream)")
+    table.add_row("Power (set-point)", f"{status.power_w:.3f} W")
     table.add_row("Output", "[green]ON[/green]" if status.output_enabled else "[red]OFF[/red]")
 
     console.print(table)
@@ -70,7 +70,7 @@ def info(
 def set_voltage(
     voltage: Annotated[float, typer.Argument(help="Target voltage in volts.")],
     port: PortArg,
-    baudrate: BaudArg = 115200,
+    baudrate: BaudArg = 9600,
 ) -> None:
     """Set the output voltage."""
     with DPS150(port=port, baudrate=baudrate) as ps:
@@ -82,7 +82,7 @@ def set_voltage(
 def set_current(
     current: Annotated[float, typer.Argument(help="Current limit in amps.")],
     port: PortArg,
-    baudrate: BaudArg = 115200,
+    baudrate: BaudArg = 9600,
 ) -> None:
     """Set the output current limit."""
     with DPS150(port=port, baudrate=baudrate) as ps:
@@ -94,7 +94,7 @@ def set_current(
 def output(
     state: Annotated[str, typer.Argument(help="'on' or 'off'.")],
     port: PortArg,
-    baudrate: BaudArg = 115200,
+    baudrate: BaudArg = 9600,
 ) -> None:
     """Enable or disable the power supply output."""
     s = state.lower().strip()

@@ -11,14 +11,13 @@ import struct
 import pytest
 
 from fnirsi_ps_control.exceptions import ChecksumError, ProtocolError
-from fnirsi_ps_control import protocol
 from fnirsi_ps_control.protocol import (
-    Frame,
-    _checksum,
     START_CTRL,
     START_QUERY,
     START_WRITE,
     Cmd,
+    Frame,
+    _checksum,
     decode_f32,
     decode_push_output,
     decode_string,
@@ -30,7 +29,6 @@ from fnirsi_ps_control.protocol import (
     encode_set_current,
     encode_set_voltage,
 )
-
 
 # ---------------------------------------------------------------------------
 # Checksum helper

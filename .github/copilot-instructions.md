@@ -139,8 +139,15 @@ uv run fnirsi output --port /dev/ttyACM0 on
 uv run fnirsi output --port /dev/ttyACM0 off
 ```
 
-Default baud rate: **115200**.  The device appears as `/dev/ttyACM0` on Linux
-(USB CDC ACM).  On Windows: `COMx`.
+Default baud rate: **9600** (confirmed from pcapng CDC SET_LINE_CODING analysis).
+The device appears as `/dev/ttyACM0` on Linux
+(USB CDC ACM, VID `0x2e3c` / PID `0x5740`, Artery AT32).
+On Windows: `COMx`.  The serial connection requires
+**DTR=False, RTS=True** (matching the manufacturer tool's CDC setup).
+
+Every TX frame must be prefixed with `0xf1` (direction byte); every RX
+frame arrives prefixed with `0xf0`.  See
+`docs/protocol/framing.md` for the full wire format.
 
 ### Linux serial port permissions
 
@@ -171,11 +178,14 @@ with DPS150("/dev/ttyACM0") as ps:
 ### Frame format
 
 ```
-[START:1] [CMD:1] [LEN:1] [DATA:LEN] [CHKSUM:1]
+[DIR:1] [START:1] [CMD:1] [LEN:1] [DATA:LEN] [CHKSUM:1]
 ```
 
+- `DIR`: `0xf1` host→device (TX), `0xf0` device→host (RX).
+  Part of the serial data stream, NOT a USB-layer artefact.
+  Confirmed from Windows USBPcap capture (raw bulk payloads).
 - No stop byte.
-- `CHKSUM = (CMD + LEN + Σ DATA bytes) mod 256`
+- `CHKSUM = (CMD + LEN + Σ DATA bytes) mod 256` (DIR and START excluded)
 - All voltage/current values: **IEEE 754 32-bit little-endian float** in SI units (V / A).
 
 ### START byte values
@@ -286,7 +296,7 @@ Commit messages must follow **Conventional Commits**:
 
 | File | Issue |
 |------|-------|
-| `src/fnirsi_ps_control/device.py` | Still uses old `millivolts`/`milliamps` integer API – must be updated to float V/A to match confirmed protocol |
-| `src/fnirsi_ps_control/cli.py` | Status display still references `.voltage_set_mv` etc. – needs updating once `device.py` is fixed |
+| `src/fnirsi_ps_control/device.py` | `DeviceStatus.output_enabled` is always `False` — offset in the 139-byte status blob not yet confirmed; needs a capture with output enabled |
+| `src/fnirsi_ps_control/device.py` | `DeviceStatus` has no measured Vout/Iout fields — use the `PUSH_OUTPUT` (CMD 0xc3) stream instead; a streaming reader is not yet implemented |
 | `docs/protocol/commands.md` offsets 96–138 | Status blob tail layout still TBD – needs another capture with output enabled |
-| CMD `0xb0` | One anomalous packet in capture; checksum doesn't verify – needs investigation |
+| `CMD 0xb0` | **Resolved**: this is the start-session magic (`b0 00 01 01 01`) sent after READY handshake; non-standard checksum is intentional |

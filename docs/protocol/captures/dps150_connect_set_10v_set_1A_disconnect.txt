@@ -1,25 +1,31 @@
 # FNIRSI DPS-150 – Capture: connect / set-V 10V / set-I 1A / disconnect
 # Date        : 2026-03-29
-# Tool        : Wireshark + usbmon (Linux)
+# Tool        : Wireshark + USBPcap (Windows 11 VM)
 # Interface   : USB CDC bulk endpoint (3.2.1)
-# USB layer   : Wireshark prepends 0xf1=OUT(host→device) / 0xf0=IN(device→host)
-#               These prefix bytes are NOT part of the application protocol.
+# USB layer   : USBPcap records raw bulk payloads without modification.
+#               The 0xf1 (TX) / 0xf0 (RX) prefix bytes ARE part of the
+#               application protocol (direction prefix), NOT USB artefacts.
+#               Verified against live hardware 2026-03-29.
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CONFIRMED FRAME FORMAT
+# CONFIRMED WIRE FORMAT
 #
-#   [START] [CMD] [LEN] [DATA × LEN bytes] [CHKSUM]
+#   [DIR] [START] [CMD] [LEN] [DATA × LEN bytes] [CHKSUM]
 #
+#   DIR     : 0xf1 = host→device (TX), 0xf0 = device→host (RX)
+#             Part of the serial data stream (confirmed from USBPcap raw bulk)
 #   START   : 0xa1 = query (host) / all device responses
 #             0xb1 = write / set command (host)
 #             0xc1 = connect / disconnect control (host)
-#             0xb0 = unknown (one occurrence, checksum anomaly – needs investigation)
+#             0xb0 = start-session magic (non-standard checksum)
 #   CMD     : 1-byte command/register ID
 #   LEN     : number of DATA bytes that follow (0–255)
 #   DATA    : LEN bytes; voltage/current encoded as IEEE 754 32-bit LE float
 #   CHKSUM  : (CMD + LEN + Σ DATA bytes) mod 256
 #
 #   No fixed stop byte.
+#
+#   Frames in this file show application bytes only (DIR prefix stripped).
 # ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -27,7 +33,13 @@
 # PHASE 1 – USB CDC negotiation (control endpoint 3.2.0, rows 1793-1825)
 # ═══════════════════════════════════════════════════════════════════════════
 # Standard CDC ACM class requests: GET/SET LINE CODING, SET CONTROL LINE STATE.
-# Baud-rate value in SET LINE CODING is irrelevant (USB CDC virtual COM).
+#
+# CONFIRMED from pcapng SET_LINE_CODING analysis:
+#   Baud rate : 9600 (initial 115200 immediately overwritten to 9600)
+#   Data bits : 8, Parity: None, Stop: 1
+#
+# CONFIRMED from pcapng SET_CONTROL_LINE_STATE analysis:
+#   DTR = 0 (deasserted throughout), RTS = 1 (asserted before data flow)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -35,7 +47,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Row 1827 – CONNECT REQUEST
-# TX (f1 prefix stripped): c1 00 01 01 02
+# Wire: f1 c1 00 01 01 02  (DIR=f1 stripped below)
 #   START=c1  CMD=00  LEN=01  DATA=01(=connect)  CHK=(00+01+01)mod256=02 ✓
 TX: c1 00 01 01 02
 
@@ -47,9 +59,10 @@ TX: a1 e1 01 00 e2
 # RX: a1 e1 01 01 e3   CHK=(e1+01+01)mod256=e3 ✓
 RX: a1 e1 01 01 e3
 
-# Row 1833 – UNKNOWN  START=b0  (checksum does NOT verify; expected 0x02, got 0x01)
-# Possibly "start info exchange" phase trigger. Needs further RE.
-TX: b0 00 01 01 01   # ANOMALY – checksum mismatch
+# Row 1833 – START_SESSION magic  (non-standard checksum: expected 0x02, got 0x01)
+# Sent by manufacturer tool in every captured session after READY check.
+# Treated as opaque 5-byte magic sequence.
+TX: b0 00 01 01 01   # start-session magic
 
 # Row 1835 – QUERY: device name
 TX: a1 de 01 00 df

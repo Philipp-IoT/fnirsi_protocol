@@ -5,7 +5,8 @@
 #                            sdist / wheel but not in a raw git checkout
 #   3. hard-coded fallback – last resort for bare git clones without a build step
 
-from importlib.metadata import PackageNotFoundError, version as _meta_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _meta_version
 
 try:
     __version__: str = _meta_version("fnirsi-ps-control")

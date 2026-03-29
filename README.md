@@ -25,10 +25,12 @@
 
 | Item | Detail |
 |------|--------|
-| Device | FNIRSI DPS-150 |
-| Interface | USB CDC (appears as `/dev/ttyACM*` on Linux, `COMx` on Windows) |
-| Baud rate | TBD (see [protocol docs](docs/protocol/README.md)) |
-| USB VID/PID | TBD |
+| Device | FNIRSI DPS-150 (150 W, 30 V / 5.1 A) |
+| MCU | Artery AT32 |
+| Interface | USB CDC ACM (appears as `/dev/ttyACM*` on Linux, `COMx` on Windows) |
+| Baud rate | **9600** 8N1 |
+| USB VID/PID | `2e3c:5740` (Artery AT32 Virtual Com Port) |
+| Serial line state | DTR=off, RTS=on |
 
 ---
 
@@ -80,7 +82,7 @@ See [docs/dev/setup.md](docs/dev/setup.md) for a full guide.
 
 ## Protocol Reverse Engineering
 
-The serial protocol was determined by capturing USB traffic with Wireshark / `usbmon` and analysing the byte patterns.
+The serial protocol was determined by capturing USB traffic with Wireshark / USBPcap and analysing the byte patterns.
 
 - Protocol overview: [docs/protocol/README.md](docs/protocol/README.md)
 - Frame format: [docs/protocol/framing.md](docs/protocol/framing.md)

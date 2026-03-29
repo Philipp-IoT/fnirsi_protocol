@@ -1,10 +1,12 @@
 # Command Catalogue
 
-> **Status:** Commands marked ✓ are confirmed from
-> `captures/dps150_connect_set_10v_set_1A_disconnect.txt`.
+> **Status:** Commands marked ✓ are confirmed from captures and
+> verified against live hardware (2026-03-29).
 > Commands marked TBD are hypothetical.
 
-All frames follow `[START] [CMD] [LEN] [DATA×LEN] [CHKSUM]` — see [framing.md](framing.md).
+All frames follow `[DIR] [START] [CMD] [LEN] [DATA×LEN] [CHKSUM]` — see [framing.md](framing.md).
+DIR = `0xf1` for TX (host→device), `0xf0` for RX (device→host).
+Frame examples below show application bytes only (DIR prefix omitted for brevity).
 
 ---
 
