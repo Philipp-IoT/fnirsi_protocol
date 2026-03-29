@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# uv
+.venv/
+.uv/
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# Pytest
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Serial captures (binary) – commit text logs explicitly instead
+docs/protocol/captures/*.bin
+docs/protocol/captures/*.cap
+docs/protocol/captures/*.pcap
+docs/protocol/captures/*.raw
+
+# Kaitai compiled output (re-generate from .ksy source)
+docs/protocol/kaitai/compiled/
+
+# Secrets / config with credentials
+*.env
+.env.*
+!.env.example
+config/local.toml

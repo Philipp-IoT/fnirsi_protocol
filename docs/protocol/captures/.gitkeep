@@ -1,0 +1,2 @@
+# Place raw serial capture log files (text) here.
+# Binary captures (.bin, .pcap, .pcapng) are git-ignored – store them locally.
