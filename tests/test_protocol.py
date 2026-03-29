@@ -24,6 +24,8 @@ from fnirsi_ps_control.protocol import (
     decode_string,
     encode_connect,
     encode_disconnect,
+    encode_output_disable,
+    encode_output_enable,
     encode_query,
     encode_set_current,
     encode_set_voltage,
@@ -180,10 +182,23 @@ class TestPayloadHelpers:
 
     def test_decode_push_output_all_zero(self) -> None:
         data = struct.pack("<fff", 0.0, 0.0, 0.0)
-        vout, iout, unk = decode_push_output(data)
+        vout, iout, pout = decode_push_output(data)
         assert vout == pytest.approx(0.0)
         assert iout == pytest.approx(0.0)
-        assert unk  == pytest.approx(0.0)
+        assert pout == pytest.approx(0.0)
+
+    def test_decode_push_output_pout_confirmed(self) -> None:
+        # Row 12827 from dps150_connect_enable_out_set_v_set_i_disable_disconnect.txt
+        # f0 a1 c3 0c  b8 43 07 41  40 c7 fd 3b  34 17 86 3d  5f
+        # Vout≈8.453 V, Iout≈0.0077 A, Pout≈0.065 W
+        data = bytes([0xb8, 0x43, 0x07, 0x41,
+                      0x40, 0xc7, 0xfd, 0x3b,
+                      0x34, 0x17, 0x86, 0x3d])
+        vout, iout, pout = decode_push_output(data)
+        assert vout == pytest.approx(8.45, abs=0.01)
+        assert iout == pytest.approx(0.0077, abs=0.001)
+        # pout ≈ Vout × Iout
+        assert pout == pytest.approx(vout * iout, rel=0.02)
 
     def test_decode_push_output_too_short(self) -> None:
         with pytest.raises(ProtocolError, match="12 bytes"):
@@ -193,4 +208,62 @@ class TestPayloadHelpers:
         frame = encode_query(Cmd.GET_FULL_STATUS)
         assert frame.start == START_QUERY
         assert frame.cmd == Cmd.GET_FULL_STATUS
+        assert frame.data == b"\x00"
+
+
+# ---------------------------------------------------------------------------
+# Output enable / disable  (CMD 0xdb)
+# ---------------------------------------------------------------------------
+
+class TestOutputControl:
+    """Tests derived from capture dps150_connect_enable_out_set_v_set_i_disable_disconnect.txt."""
+
+    def test_enable_confirmed_bytes(self) -> None:
+        # Row 12795: f1 b1 db 01 01 dd  (f1 prefix stripped by Wireshark)
+        frame = encode_output_enable()
+        raw = frame.encode()
+        assert raw == bytes([0xB1, 0xDB, 0x01, 0x01, 0xDD])
+
+    def test_disable_confirmed_bytes(self) -> None:
+        # Row 16335: f1 b1 db 01 00 dc
+        frame = encode_output_disable()
+        raw = frame.encode()
+        assert raw == bytes([0xB1, 0xDB, 0x01, 0x00, 0xDC])
+
+    def test_enable_checksum(self) -> None:
+        # CHKSUM = (0xdb + 0x01 + 0x01) mod 256 = 0xdd
+        assert _checksum(0xDB, 1, b"\x01") == 0xDD
+
+    def test_disable_checksum(self) -> None:
+        # CHKSUM = (0xdb + 0x01 + 0x00) mod 256 = 0xdc
+        assert _checksum(0xDB, 1, b"\x00") == 0xDC
+
+    def test_enable_round_trip(self) -> None:
+        tx = encode_output_enable()
+        rx = Frame.decode(tx.encode())
+        assert rx.start == START_WRITE
+        assert rx.cmd == Cmd.SET_OUTPUT
+        assert rx.data == b"\x01"
+
+    def test_disable_round_trip(self) -> None:
+        tx = encode_output_disable()
+        rx = Frame.decode(tx.encode())
+        assert rx.start == START_WRITE
+        assert rx.cmd == Cmd.SET_OUTPUT
+        assert rx.data == b"\x00"
+
+    def test_device_echo_enable(self) -> None:
+        # Device responds: a1 db 01 01 dd  (row 12797)
+        echo = bytes([0xA1, 0xDB, 0x01, 0x01, 0xDD])
+        frame = Frame.decode(echo)
+        assert frame.start == START_QUERY   # 0xa1 = response
+        assert frame.cmd == Cmd.SET_OUTPUT
+        assert frame.data == b"\x01"
+
+    def test_device_echo_disable(self) -> None:
+        # Device responds: a1 db 01 00 dc  (row 16347)
+        echo = bytes([0xA1, 0xDB, 0x01, 0x00, 0xDC])
+        frame = Frame.decode(echo)
+        assert frame.start == START_QUERY
+        assert frame.cmd == Cmd.SET_OUTPUT
         assert frame.data == b"\x00"

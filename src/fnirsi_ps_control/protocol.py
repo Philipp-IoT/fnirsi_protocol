@@ -48,9 +48,10 @@ class Cmd:
     # Host writes (START=0xb1)
     SET_VOLTAGE:     int = 0xC1   # DATA: float32 LE [V]
     SET_CURRENT:     int = 0xC2   # DATA: float32 LE [A]
+    SET_OUTPUT:      int = 0xDB   # DATA: uint8  0x01=enable 0x00=disable; device echoes back
 
     # Periodic device push (~600 ms, unsolicited, START=0xa1)
-    PUSH_OUTPUT:     int = 0xC3   # 3 × float32: Vout[V], Iout[A], ?
+    PUSH_OUTPUT:     int = 0xC3   # 3 × float32: Vout[V], Iout[A], Pout[W]
     PUSH_VIN_A:      int = 0xC0   # float32: Vin channel A [V] (~20.1 V)
     PUSH_VIN_B:      int = 0xE2   # float32: Vin channel B [V] (~19.9 V)
     PUSH_MAX_I_REF:  int = 0xE3   # float32: always 5.1 A (max current constant)
@@ -171,6 +172,24 @@ def encode_set_current(amps: float) -> Frame:
     return Frame(start=START_WRITE, cmd=Cmd.SET_CURRENT, data=struct.pack("<f", amps))
 
 
+def encode_output_enable() -> Frame:
+    """Build a SET_OUTPUT frame that enables output.
+
+    TX: ``b1 db 01 01 dd``  (CHKSUM = (0xdb+0x01+0x01) mod 256 = 0xdd).
+    Device echoes back with START=0xa1.
+    """
+    return Frame(start=START_WRITE, cmd=Cmd.SET_OUTPUT, data=b"\x01")
+
+
+def encode_output_disable() -> Frame:
+    """Build a SET_OUTPUT frame that disables output.
+
+    TX: ``b1 db 01 00 dc``  (CHKSUM = (0xdb+0x01+0x00) mod 256 = 0xdc).
+    Device echoes back with START=0xa1.
+    """
+    return Frame(start=START_WRITE, cmd=Cmd.SET_OUTPUT, data=b"\x00")
+
+
 def encode_query(cmd: int) -> Frame:
     """Build a generic read-request frame (DATA = 0x00)."""
     return Frame(start=START_QUERY, cmd=cmd, data=b"\x00")
@@ -198,9 +217,13 @@ def decode_push_output(data: bytes) -> tuple[float, float, float]:
     Returns
     -------
     tuple
-        ``(vout_V, iout_A, unknown)`` — all 0.0 when output is disabled.
+        ``(vout_V, iout_A, pout_W)`` — all 0.0 when output is disabled.
+
+    Pout is confirmed from capture
+    ``dps150_connect_enable_out_set_v_set_i_disable_disconnect.txt`` row 12827:
+    Vout≈8.45 V, Iout≈0.0077 A → third float ≈0.065 W ≈ 8.45×0.0077.
     """
     if len(data) < 12:
         raise ProtocolError(f"CMD_PUSH_OUTPUT: expected 12 bytes, got {len(data)}")
-    vout, iout, unknown = struct.unpack_from("<fff", data)
-    return float(vout), float(iout), float(unknown)
+    vout, iout, pout = struct.unpack_from("<fff", data)
+    return float(vout), float(iout), float(pout)

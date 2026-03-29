@@ -49,6 +49,7 @@ types:
             'command_id::get_full_status': full_status_payload
             'command_id::set_voltage':     float32_payload
             'command_id::set_current':     float32_payload
+            'command_id::set_output':      output_enable_payload
             'command_id::push_output':     push_output_payload
             'command_id::push_vin_a':      float32_payload
             'command_id::push_vin_b':      float32_payload
@@ -62,6 +63,17 @@ types:
   # ---------------------------------------------------------------------------
   # Payload types
   # ---------------------------------------------------------------------------
+  output_enable_payload:
+    doc: |
+      Payload for CMD set_output (0xdb).
+      DATA = 0x01 → enable output, DATA = 0x00 → disable output.
+      The device echoes the full frame back with START = 0xa1.
+      Confirmed from capture dps150_connect_enable_out_set_v_set_i_disable_disconnect.txt.
+    seq:
+      - id: state
+        type: u1
+        enum: output_state
+
   connect_payload:
     doc: |
       Payload for CMD connect_ctrl (0x00).
@@ -103,9 +115,11 @@ types:
       - id: iout
         type: f4
         doc: Measured output current [A].
-      - id: unknown
+      - id: pout
         type: f4
-        doc: Third float – interpretation TBD (Pout? temperature?).
+        doc: |
+          Measured output power [W].
+          Confirmed from capture row 12827: Vout≈8.45 V, Iout≈0.0077 A → Pout≈0.065 W.
 
   full_status_payload:
     doc: |
@@ -187,6 +201,7 @@ enums:
     0xc2: set_current
     0xc3: push_output
     0xc4: push_vin_c
+    0xdb: set_output
     0xde: get_device_name
     0xdf: get_fw_version
     0xe0: get_hw_version
@@ -198,3 +213,7 @@ enums:
   connect_state:
     0x00: disconnect
     0x01: connect
+
+  output_state:
+    0x00: disabled
+    0x01: enabled

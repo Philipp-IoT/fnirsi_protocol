@@ -138,6 +138,30 @@ DATA = current limit in **amps** as IEEE 754 32-bit LE float.
 
 ---
 
+## Enable / Disable Output — CMD 0xdb  (START=0xb1) ✓
+
+> Confirmed from `captures/dps150_connect_enable_out_set_v_set_i_disable_disconnect.txt`
+
+**Frame:** `b1 db 01 [state] [chk]`
+
+| Action  | Frame               | CHKSUM |
+|---------|---------------------|--------|
+| Enable  | `b1 db 01 01 dd`    | (db+01+01) mod 256 = dd ✓ |
+| Disable | `b1 db 01 00 dc`    | (db+01+00) mod 256 = dc ✓ |
+
+DATA byte `0x01` = enable, `0x00` = disable.
+
+**Response:** The device **echoes** the full frame back with START=0xa1:
+
+| Action  | Echo frame          |
+|---------|---------------------|
+| Enable  | `a1 db 01 01 dd`    |
+| Disable | `a1 db 01 00 dc`    |
+
+**Capture evidence:** rows 12795/12797 (enable) and 16335/16347 (disable).
+
+---
+
 ## Periodic Device Push: Output Measurements — CMD 0xc3  (START=0xa1) ✓
 
 **Interval:** ~600 ms (unsolicited; device sends continuously).
@@ -148,11 +172,16 @@ DATA = current limit in **amps** as IEEE 754 32-bit LE float.
 |-------------|----------------------|
 | 0           | Vout measured [V]    |
 | 1           | Iout measured [A]    |
-| 2           | ? (TBD)              |
+| 2           | Pout measured [W]    |
 
 All three are 0.0 when the output is disabled.
 
-**Capture evidence:** rows 2481, 2741, 2809, 2827, 2841, 2851, etc.
+Pout confirmed: after enabling output with Vout≈8.45 V and Iout≈0.0077 A the third
+float reads ≈0.065 W (= 8.45 × 0.0077). Cross-checked against the full-status blob
+offset 20 which also carries Pout.
+
+**Capture evidence (original):** rows 2481, 2741, 2809, 2827, 2841, 2851, etc.
+**Capture evidence (Pout):** row 12827 of `dps150_connect_enable_out_set_v_set_i_disable_disconnect.txt`
 
 ---
 
