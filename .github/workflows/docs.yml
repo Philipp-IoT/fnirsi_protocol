@@ -1,0 +1,69 @@
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev --extra docs
+
+      - name: Install kaitai-struct-compiler 0.11
+        run: |
+          wget -q https://github.com/kaitai-io/kaitai_struct_compiler/releases/download/0.11/kaitai-struct-compiler-0.11.zip
+          unzip -q kaitai-struct-compiler-0.11.zip
+          echo "$PWD/kaitai-struct-compiler-0.11/bin" >> $GITHUB_PATH
+
+      - name: Generate Kaitai Python parser from .ksy
+        run: bash scripts/gen_kaitai.sh
+
+      - name: Generate protocol reference Markdown from .ksy
+        run: |
+          uv run python scripts/ksy_to_md.py \
+            --ksy protocol/fnirsi_dps150.ksy \
+            --out docs/protocol/reference.md
+
+      - name: Verify generated files match committed baseline
+        run: git diff --exit-code protocol/generated/ docs/protocol/reference.md
+
+      - name: Build MkDocs site
+        run: uv run mkdocs build --strict
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
