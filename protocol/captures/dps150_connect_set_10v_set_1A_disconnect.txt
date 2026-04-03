@@ -1,0 +1,204 @@
+# FNIRSI DPS-150 – Capture: connect / set-V 10V / set-I 1A / disconnect
+# Date        : 2026-03-29
+# Tool        : Wireshark + USBPcap (Windows 11 VM)
+# Interface   : USB CDC bulk endpoint (3.2.1)
+# USB layer   : USBPcap records raw bulk payloads without modification.
+#               The 0xf1 (TX) / 0xf0 (RX) prefix bytes ARE part of the
+#               application protocol (direction prefix), NOT USB artefacts.
+#               Verified against live hardware 2026-03-29.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIRMED WIRE FORMAT
+#
+#   [DIR] [START] [CMD] [LEN] [DATA × LEN bytes] [CHKSUM]
+#
+#   DIR     : 0xf1 = host→device (TX), 0xf0 = device→host (RX)
+#             Part of the serial data stream (confirmed from USBPcap raw bulk)
+#   START   : 0xa1 = query (host) / all device responses
+#             0xb1 = write / set command (host)
+#             0xc1 = connect / disconnect control (host)
+#             0xb0 = start-session magic (non-standard checksum)
+#   CMD     : 1-byte command/register ID
+#   LEN     : number of DATA bytes that follow (0–255)
+#   DATA    : LEN bytes; voltage/current encoded as IEEE 754 32-bit LE float
+#   CHKSUM  : (CMD + LEN + Σ DATA bytes) mod 256
+#
+#   No fixed stop byte.
+#
+#   Frames in this file show application bytes only (DIR prefix stripped).
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 1 – USB CDC negotiation (control endpoint 3.2.0, rows 1793-1825)
+# ═══════════════════════════════════════════════════════════════════════════
+# Standard CDC ACM class requests: GET/SET LINE CODING, SET CONTROL LINE STATE.
+#
+# CONFIRMED from pcapng SET_LINE_CODING analysis:
+#   Baud rate : 9600 (initial 115200 immediately overwritten to 9600)
+#   Data bits : 8, Parity: None, Stop: 1
+#
+# CONFIRMED from pcapng SET_CONTROL_LINE_STATE analysis:
+#   DTR = 0 (deasserted throughout), RTS = 1 (asserted before data flow)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 2 – Application-layer handshake (bulk endpoint 3.2.1)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Row 1827 – CONNECT REQUEST
+# Wire: f1 c1 00 01 01 02  (DIR=f1 stripped below)
+#   START=c1  CMD=00  LEN=01  DATA=01(=connect)  CHK=(00+01+01)mod256=02 ✓
+TX: c1 00 01 01 02
+
+# Row 1829 – QUERY: ready status
+# TX: a1 e1 01 00 e2   CHK=(e1+01+00)mod256=e2 ✓
+TX: a1 e1 01 00 e2
+
+# Row 1831 – RESPONSE: ready status = 0x01 (device ready)
+# RX: a1 e1 01 01 e3   CHK=(e1+01+01)mod256=e3 ✓
+RX: a1 e1 01 01 e3
+
+# Row 1833 – START_SESSION magic  (non-standard checksum: expected 0x02, got 0x01)
+# Sent by manufacturer tool in every captured session after READY check.
+# Treated as opaque 5-byte magic sequence.
+TX: b0 00 01 01 01   # start-session magic
+
+# Row 1835 – QUERY: device name
+TX: a1 de 01 00 df
+
+# Row 1837 – RESPONSE: device name
+# DATA = 44 50 53 2d 31 35 30 = ASCII "DPS-150"  CHK=8f ✓
+RX: a1 de 07 44 50 53 2d 31 35 30 8f   # "DPS-150"
+
+# Row 1839 – QUERY: hardware version
+TX: a1 e0 01 00 e1
+
+# Row 1841 – RESPONSE: HW version
+# DATA = 56 31 2e 32 = ASCII "V1.2"  CHK=cb ✓
+RX: a1 e0 04 56 31 2e 32 cb   # "V1.2"
+
+# Row 1843 – QUERY: firmware version
+TX: a1 df 01 00 e0
+
+# Row 1845 – QUERY: full status blob (sent before 1846 response arrives)
+TX: a1 ff 01 00 00
+
+# Row 1846 – RESPONSE: FW version
+# DATA = 56 31 2e 30 = ASCII "V1.0"  CHK=c8 ✓
+RX: a1 df 04 56 31 2e 30 c8   # "V1.0"
+
+# Row 1849 – RESPONSE: full status blob  CMD=ff  LEN=0x8b (139 bytes)  CHK=aa ✓
+#
+# Decoded float layout (IEEE 754 32-bit LE, 4 bytes each):
+#
+#  Off  Hex           Float       Interpretation
+#  ───  ────────────  ──────────  ─────────────────────────────────────────
+#    0  f7 c2 a0 41   20.0952 V   Vin measured
+#    4  00 00 40 41   12.0000 V   Vset (last/default)
+#    8  cd cc cc 3d    0.1000 A   Iset (last/default)
+#   12  00 00 00 00    0.0000     Vout measured  (output OFF)
+#   16  00 00 00 00    0.0000     Iout measured  (output OFF)
+#   20  00 00 00 00    0.0000     Pout measured  (output OFF)
+#   24  e4 f2 bc 41   23.6186 V  ?  (internal rail / Vin2 – TBD)
+#   28  00 00 40 41   12.0000 V  Vset echo / channel 2 (TBD)
+#   32  c3 cc cc 3d    0.1000 A  Iset echo / channel 2 (TBD)
+#   36  00 00 a0 40    5.0000 V  Preset 1 Vset
+#   40  00 00 80 3f    1.0000 A  Preset 1 Iset
+#   44  00 00 a0 40    5.0000 V  Preset 2 Vset
+#   48  00 00 80 3f    1.0000 A  Preset 2 Iset
+#   52  00 00 a0 40    5.0000 V  Preset 3 Vset
+#   56  00 00 80 3f    1.0000 A  Preset 3 Iset
+#   60  00 00 a0 40    5.0000 V  Preset 4 Vset
+#   64  00 00 80 3f    1.0000 A  Preset 4 Iset
+#   68  00 00 a0 40    5.0000 V  Preset 5 Vset
+#   72  00 00 80 3f    1.0000 A  Preset 5 Iset
+#   76  00 00 f0 41   30.0000 V  MAX_VOLTAGE (device limit)
+#   80  33 33 a3 40    5.1000 A  MAX_CURRENT (device limit)
+#   84  00 00 16 43  150.0000 W  MAX_POWER   (DPS-150 = 150 W confirmed)
+#   88  00 00 a0 42   80.0000    MAX_TEMP [°C]? – TBD
+#   92  00 00 a0 40    5.0000    ? – TBD
+#
+#  Mixed-type section (offsets 96–138, exact layout TBD):
+#   96  0a 00 00 00  uint32=10   preset count? model number?
+#  100  00 00 00 00  0
+#  104  00 00 00 00  0
+#  108  00           uint8=0x00
+#  109  01           uint8=0x01  output state? (1=enabled)
+#  110  01           uint8=0x01  lock state? – TBD
+#  111  5d 29 9f 41  19.8952 V  (TBD)
+#  115  33 33 a3 40   5.1000 A  MAX_CURRENT repeat
+#  119  00 00 f0 41  30.0000 V  MAX_VOLTAGE repeat
+#  123  33 33 a3 40   5.1000
+#  127  00 00 16 43 150.0000    MAX_POWER repeat
+#  131  00 00 c6 42  99.0000    ? – TBD
+#  135  00 00 f0 41  30.0000
+#  [byte 139 = checksum 0xaa]
+#
+RX: a1 ff 8b f7c2a041 00004041 cdcccc3d 00000000 00000000 00000000 e4f2bc41 00004041 c3cccc3d 0000a040 0000803f 0000a040 0000803f 0000a040 0000803f 0000a040 0000803f 0000a040 0000803f 0000f041 3333a340 00001643 0000a042 0000a040 0a000000 00000000 00000000 00000001 01 5d299f41 3333a340 0000f041 3333a340 00001643 0000c642 0000f041 aa
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 3 – Initial set (PC software restores last-used setpoints)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Row 1851 – SET_VOLTAGE 12.0 V  (software restoring last session value)
+# START=b1  CMD=c1  LEN=04  DATA=0x41400000(LE)=12.0f  CHK=0x46 ✓
+TX: b1 c1 04 00 00 40 41 46   # 12.0000 V
+
+# Row 1853 – SET_CURRENT 0.1 A  (software restoring last session value)
+# START=b1  CMD=c2  LEN=04  DATA=0x3dcccccd(LE)=0.1f   CHK=0x68 ✓
+TX: b1 c2 04 cd cc cc 3d 68   # 0.1000 A
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 4 – Device periodic push  (5-message burst, ~600 ms interval)
+# ═══════════════════════════════════════════════════════════════════════════
+# Output is OFF throughout – all output measurement floats are 0.
+
+# CMD c3 – output measurements: [Vout | Iout | ???]  (all 0.0 = output OFF)
+RX: a1 c3 0c 00000000 00000000 00000000 cf   # 0.0 V / 0.0 A / 0.0 (output OFF)
+
+# CMD c0 – Vin channel A (~20.10 V – input supply voltage)
+RX: a1 c0 04 d5 c5 a0 41 3f   # 20.0966 V
+
+# CMD e2 – ??? (~19.90 V, stable – same rail or ADC alt channel)
+RX: a1 e2 04 3b 2c 9f 41 2d   # 19.8966 V
+
+# CMD e3 – constant MAX_CURRENT broadcast (5.1 A = device rated max)
+RX: a1 e3 04 33 33 a3 40 30   # 5.1000 A  (constant reference)
+
+# CMD c4 – ??? (~23.67 V – possibly Vin2 or internal boost rail)
+RX: a1 c4 04 c0 5d bd 41 e3   # 23.6708 V
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 5 – SET VOLTAGE 10 V  (rows 2837, 2839)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Row 2837 – intermediate slider step: 1.0 V (user dragging slider)
+TX: b1 c1 04 00 00 80 3f 84   # 1.0000 V  (transient)
+
+# Row 2839 – SET_VOLTAGE 10.0 V  ← target confirmed
+# DATA=0x41200000(LE)=10.0f  CHK=(c1+04+00+00+20+41)mod256=0x26 ✓
+TX: b1 c1 04 00 00 20 41 26   # 10.0000 V  ✓ CONFIRMED
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 6 – SET CURRENT 1 A  (row 3393)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Row 3393 – SET_CURRENT 1.0 A  ← target confirmed
+# DATA=0x3f800000(LE)=1.0f   CHK=(c2+04+00+00+80+3f)mod256=0x85 ✓
+TX: b1 c2 04 00 00 80 3f 85   # 1.0000 A  ✓ CONFIRMED
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASE 7 – DISCONNECT  (row 4963)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Row 4963 – DISCONNECT REQUEST
+# START=c1  CMD=00  LEN=01  DATA=00(=disconnect)  CHK=(00+01+00)mod256=01 ✓
+TX: c1 00 01 00 01
+
+# Rows 4965, 7365 – USB CDC SET CONTROL LINE STATE (RTS/DTR drop, OS disconnect)
