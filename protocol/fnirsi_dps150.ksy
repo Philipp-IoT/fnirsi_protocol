@@ -1,29 +1,27 @@
+# Serial protocol for the FNIRSI DPS-150 regulated power supply,
+# communicated over USB CDC (virtual COM port, USB bulk endpoint).
+#
+# Wire format  [DIR][START][CMD][LEN][DATA×LEN][CHKSUM]
+#   DIR    : 0xf1 host→device | 0xf0 device→host (direction prefix)
+#   START  : 0xa1 query/response | 0xb1 write cmd | 0xc1 connect/disconnect
+#   CHKSUM : (CMD + LEN + Σ DATA) mod 256  (DIR and START excluded)
+#   Values : IEEE 754 32-bit little-endian float for voltage / current
+#
+# The DIR byte is part of the serial data stream, NOT a USB-layer
+# artefact (confirmed from Windows USBPcap raw bulk payloads).
+# This spec describes the application frame AFTER stripping the DIR byte.
+#
+# Status: CONFIRMED from capture and live hardware test 2026-03-29
+# USB: VID 0x2e3c (Artery) / PID 0x5740 (AT32 Virtual Com Port)
+# Serial: 9600 baud, 8N1, DTR=off, RTS=on
+
 meta:
   id: fnirsi_dps150
   title: FNIRSI DPS-150 Serial Protocol
   file-extension: bin
   license: MIT
-  ks-version: 0.10
+  ks-version: '0.11'
   endian: le
-  doc: |
-    Serial protocol for the FNIRSI DPS-150 regulated power supply,
-    communicated over USB CDC (virtual COM port, USB bulk endpoint).
-
-    Wire format  [DIR][START][CMD][LEN][DATA×LEN][CHKSUM]
-      DIR    : 0xf1 host→device | 0xf0 device→host (direction prefix)
-      START  : 0xa1 query/response | 0xb1 write cmd | 0xc1 connect/disconnect
-      CHKSUM : (CMD + LEN + Σ DATA) mod 256  (DIR and START excluded)
-      Values : IEEE 754 32-bit little-endian float for voltage / current
-
-    The DIR byte is part of the serial data stream, NOT a USB-layer
-    artefact (confirmed from Windows USBPcap raw bulk payloads).
-
-    This spec describes the application frame AFTER stripping the DIR byte.
-
-    Status: CONFIRMED from capture and live hardware test 2026-03-29
-    USB: VID 0x2e3c (Artery) / PID 0x5740 (AT32 Virtual Com Port)
-    Serial: 9600 baud, 8N1, DTR=off, RTS=on
-    Capture date: 2026-03-29
 
 seq:
   - id: frame
@@ -61,7 +59,7 @@ types:
             'command_id::push_output':     push_output_payload
             'command_id::push_vin_a':      float32_payload
             'command_id::push_vin_b':      float32_payload
-            'command_id::push_max_current':float32_payload
+            'command_id::push_max_current': float32_payload
             'command_id::push_vin_c':      float32_payload
       - id: checksum
         type: u1
