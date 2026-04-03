@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev --extra docs
 
+      - name: Install Graphviz
+        run: sudo apt-get install -y graphviz
+
       - name: Install kaitai-struct-compiler 0.11
         run: |
           wget -q https://github.com/kaitai-io/kaitai_struct_compiler/releases/download/0.11/kaitai-struct-compiler-0.11.zip
