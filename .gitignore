@@ -50,6 +50,9 @@ docs/protocol/captures/*.raw
 # Kaitai compiled output (re-generate from .ksy source)
 docs/protocol/kaitai/compiled/
 
+# MkDocs build output
+site/
+
 # Secrets / config with credentials
 *.env
 .env.*

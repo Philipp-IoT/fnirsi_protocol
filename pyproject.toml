@@ -31,6 +31,9 @@ dev = [
   "mypy>=1.10",
   "types-pyserial",
   "python-semantic-release>=9",
+  "mkdocs>=1.6.1",
+  "mkdocs-material>=9.7.6",
+  "pymdown-extensions>=10.21.2",
 ]
 
 [project.scripts]

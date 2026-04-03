@@ -74,11 +74,11 @@ Windows tool to:
 1. Stop the capture.
 2. File → Export Specified Packets → save as `docs/protocol/captures/<description>.pcapng`.
 3. Also export as **"C Arrays"** for annotated `.txt` captures.
-4. Note findings in [commands.md](protocol/commands.md) with the capture filename as evidence.
+4. Note findings in the [protocol spec](protocol/spec.md) with the capture filename as evidence.
 
 > **Important**: The wire format includes a **direction byte** (`0xf1` TX,
 > `0xf0` RX) as the first byte of every frame.  This is part of the serial
-> data stream, not a USB-layer artefact.  See [framing.md](protocol/framing.md).
+> data stream, not a USB-layer artefact.  See [protocol spec](protocol/spec.md).
 
 ---
 

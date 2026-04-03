@@ -147,7 +147,7 @@ On Windows: `COMx`.  The serial connection requires
 
 Every TX frame must be prefixed with `0xf1` (direction byte); every RX
 frame arrives prefixed with `0xf0`.  See
-`docs/protocol/framing.md` for the full wire format.
+`docs/protocol/kaitai/fnirsi_dps150.ksy` for the full wire format.
 
 ### Linux serial port permissions
 
@@ -214,9 +214,7 @@ with DPS150("/dev/ttyACM0") as ps:
 | `0xe3` | `0xa1` | RX push | MAX_CURRENT constant 5.1 A float32 |
 | `0xff` | `0xa1` | RX | Full status blob (139 bytes) |
 
-Full command catalogue: `docs/protocol/commands.md`
-Frame format details: `docs/protocol/framing.md`
-Kaitai Struct spec: `docs/protocol/kaitai/fnirsi_dps150.ksy`
+Full protocol spec (single source of truth): `docs/protocol/kaitai/fnirsi_dps150.ksy`
 
 ---
 
@@ -228,8 +226,8 @@ Kaitai Struct spec: `docs/protocol/kaitai/fnirsi_dps150.ksy`
 2. Decode frames using the Python snippet pattern from prior captures
    (see existing annotated `.txt` files).
 3. Verify every checksum: `(CMD + LEN + Σ data) % 256`.
-4. Update `docs/protocol/commands.md` with the new CMD, citing the capture file.
-5. Update `docs/protocol/kaitai/fnirsi_dps150.ksy` (enum + payload type).
+4. Update `docs/protocol/kaitai/fnirsi_dps150.ksy` (enum + payload type) — this is the single source of truth.
+5. Update `docs/protocol/spec.md` with an annotated wire example.
 6. Add/update `src/fnirsi_ps_control/protocol.py` (`Cmd` class + helper function).
 7. Write a byte-exact unit test in `tests/test_protocol.py`.
 8. Commit using conventional commit: `docs(protocol): ...` or `feat(protocol): ...`.
@@ -298,5 +296,5 @@ Commit messages must follow **Conventional Commits**:
 |------|-------|
 | `src/fnirsi_ps_control/device.py` | `DeviceStatus.output_enabled` is always `False` — offset in the 139-byte status blob not yet confirmed; needs a capture with output enabled |
 | `src/fnirsi_ps_control/device.py` | `DeviceStatus` has no measured Vout/Iout fields — use the `PUSH_OUTPUT` (CMD 0xc3) stream instead; a streaming reader is not yet implemented |
-| `docs/protocol/commands.md` offsets 96–138 | Status blob tail layout still TBD – needs another capture with output enabled |
+| `docs/protocol/kaitai/fnirsi_dps150.ksy` full_status_payload remainder | Status blob tail layout still TBD – needs another capture with output enabled |
 | `CMD 0xb0` | **Resolved**: this is the start-session magic (`b0 00 01 01 01`) sent after READY handshake; non-standard checksum is intentional |

@@ -85,9 +85,8 @@ See [docs/dev/setup.md](docs/dev/setup.md) for a full guide.
 The serial protocol was determined by capturing USB traffic with Wireshark / USBPcap and analysing the byte patterns.
 
 - Protocol overview: [docs/protocol/README.md](docs/protocol/README.md)
-- Frame format: [docs/protocol/framing.md](docs/protocol/framing.md)
-- Command catalogue: [docs/protocol/commands.md](docs/protocol/commands.md)
-- Machine-readable spec: [docs/protocol/kaitai/fnirsi_dps150.ksy](docs/protocol/kaitai/fnirsi_dps150.ksy) (Kaitai Struct)
+- Protocol specification: [docs/protocol/spec.md](docs/protocol/spec.md)
+- Kaitai Struct spec (single source of truth): [docs/protocol/kaitai/fnirsi_dps150.ksy](docs/protocol/kaitai/fnirsi_dps150.ksy)
 
 ---
 

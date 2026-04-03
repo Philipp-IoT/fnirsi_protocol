@@ -244,7 +244,7 @@ def _parse_status(frame: protocol.Frame) -> DeviceStatus:
     * bytes  8–11: I_set   float32 LE [A]  (e.g.  1.0 A)
 
     Remaining 139-byte blob layout is still partially TBD
-    (see ``docs/protocol/commands.md``).
+    (see ``docs/protocol/kaitai/fnirsi_dps150.ksy`` — full_status_payload type).
     """
     import struct
 
