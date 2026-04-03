@@ -2,7 +2,7 @@
 
 # Protocol Reference
 
-Single source of truth: [`protocol/fnirsi_dps150.ksy`](../../protocol/fnirsi_dps150.ksy)
+Single source of truth: `protocol/fnirsi_dps150.ksy`
 
 ## Overview
 
