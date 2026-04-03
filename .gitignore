@@ -49,6 +49,9 @@ protocol/captures/*.raw
 protocol/captures/*.pcapng
 
 # NOTE: protocol/generated/fnirsi_dps150.py IS committed (baseline)
+# ksc also emits graphviz diagrams — ignore those
+protocol/generated/*.dot
+protocol/generated/*.svg
 # Only ignore any hypothetical compiled/ subdirectory
 protocol/generated/compiled/
 
