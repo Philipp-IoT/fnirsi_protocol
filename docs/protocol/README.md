@@ -5,7 +5,7 @@
 
 Device details (USB IDs, serial config, baud rate), the wire format, all
 command IDs, payload types and enumerations are defined in the
-[Kaitai Struct spec](kaitai/fnirsi_dps150.ksy), embedded in the
+[Kaitai Struct spec](reference.md), embedded in the
 [Specification](spec.md) page.
 
 ---
@@ -16,8 +16,8 @@ command IDs, payload types and enumerations are defined in the
 |----------|----------|
 | [spec.md](spec.md) | Protocol specification (embeds the `.ksy` — single source of truth) |
 | [session.md](session.md) | Session lifecycle: connect → operate → disconnect |
-| [kaitai/fnirsi_dps150.ksy](kaitai/fnirsi_dps150.ksy) | Kaitai Struct spec (authoritative, machine-readable) |
-| [captures/](captures/) | Raw capture log files (binary excluded via .gitignore) |
+| [reference.md](reference.md) | Auto-generated reference from the Kaitai Struct spec |
+| [captures.md](captures.md) | Raw capture log files (binary excluded via .gitignore) |
 
 ---
 
