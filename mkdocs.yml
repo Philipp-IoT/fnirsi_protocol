@@ -1,7 +1,7 @@
 site_name: FNIRSI DPS-150 Protocol
 site_description: Reverse engineering and Python CLI demo for the FNIRSI DPS-150 power supply
-repo_url: https://github.com/pb-/fnirsi_ps_control
-repo_name: pb-/fnirsi_ps_control
+repo_url: https://github.com/Philipp-IoT/fnirsi_protocol
+repo_name: Philipp-IoT/fnirsi_protocol
 edit_uri: edit/main/docs/
 
 theme:
@@ -70,4 +70,4 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/pb-/fnirsi_ps_control
+      link: https://github.com/Philipp-IoT/fnirsi_protocol

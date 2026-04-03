@@ -43,9 +43,9 @@ docs = [
 fnirsi = "fnirsi_ps_control.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/pb-/fnirsi_ps_control"
-Repository = "https://github.com/pb-/fnirsi_ps_control"
-"Issue Tracker" = "https://github.com/pb-/fnirsi_ps_control/issues"
+Homepage = "https://github.com/Philipp-IoT/fnirsi_protocol"
+Repository = "https://github.com/Philipp-IoT/fnirsi_protocol"
+"Issue Tracker" = "https://github.com/Philipp-IoT/fnirsi_protocol/issues"
 
 # ---------------------------------------------------------------------------
 # Build
