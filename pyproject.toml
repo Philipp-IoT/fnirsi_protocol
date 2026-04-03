@@ -1,0 +1,128 @@
+[project]
+name = "fnirsi-ps-control"
+dynamic = ["version"]
+description = "Protocol reverse engineering and CLI demo for the FNIRSI DPS-150 regulated power supply"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Philipp Bolte" }]
+requires-python = ">=3.11"
+keywords = ["fnirsi", "dps-150", "power-supply", "serial", "usb-cdc", "reverse-engineering"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: System :: Hardware :: Hardware Drivers",
+]
+
+dependencies = [
+  "pyserial>=3.5",
+  "typer>=0.12",
+  "rich>=13",
+  "kaitaistruct>=0.10",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8",
+  "pytest-cov>=5",
+  "ruff>=0.4",
+  "mypy>=1.10",
+  "types-pyserial",
+  "python-semantic-release>=9",
+]
+docs = [
+  "mkdocs-material>=9",
+  "pymdown-extensions>=10",
+  "pyyaml>=6",
+]
+
+[project.scripts]
+fnirsi = "fnirsi_ps_control.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/pb-/fnirsi_ps_control"
+Repository = "https://github.com/pb-/fnirsi_ps_control"
+"Issue Tracker" = "https://github.com/pb-/fnirsi_ps_control/issues"
+
+# ---------------------------------------------------------------------------
+# Build
+# ---------------------------------------------------------------------------
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "python-simplified-semver"
+local_scheme = "no-local-version"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/fnirsi_ps_control/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fnirsi_ps_control"]
+
+# ---------------------------------------------------------------------------
+# Ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src"]
+extend-exclude = ["_version.py"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "C4", "ANN"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------------------------------------------------------------------------
+# Mypy
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# ---------------------------------------------------------------------------
+# python-semantic-release
+# ---------------------------------------------------------------------------
+[tool.semantic_release]
+version_source = "tag"
+tag_format = "v{version}"
+commit_message = "chore(release): v{version} [skip ci]"
+major_on_zero = false
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = ["feat", "fix", "perf", "refactor", "docs", "style", "test", "chore", "ci", "build", "revert"]
+minor_tags   = ["feat"]
+patch_tags   = ["fix", "perf"]
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+  "^chore\\(release\\)",
+  "^chore",
+  "^ci",
+  "^style",
+  "^test",
+]
