@@ -1,27 +1,48 @@
 # 3. System Scope and Context
 
-<!-- ARC42 §3: Define what is INSIDE the system boundary and what is OUTSIDE.
-     Show external actors/systems and the interfaces between them and the system. -->
-
 ## Business Context
-
-<!-- Describe actors and data flows in plain English.
-     Who/what interacts with the system and what information is exchanged? -->
-
-_To be filled._
-
-## Technical Context
-
-<!-- Show the technical interfaces (protocols, data formats, channels).
-     A context diagram is strongly recommended here. -->
 
 ```mermaid
 graph LR
-    User["Operator / Developer"]
-    Lib["fnirsi-ps-control"]
-    HW["FNIRSI DPS-150"]
-    User -->|"CLI / Python API"| Lib
-    Lib -->|"USB Serial CDC ACM 9600 8N1"| HW
+    subgraph Stakeholders
+        LU["Linux User"]
+        TAE["Test Automation Engineer"]
+        GD["GUI Developer"]
+        PR["Protocol Researcher"]
+    end
+
+    subgraph System
+        SYS["fnirsi-ps-control"]
+    end
+
+    subgraph Hardware
+        DPS["FNIRSI DPS-150"]
+    end
+
+    LU -- "control device from Linux" --> SYS
+    TAE -- "script reproducible test sequences" --> SYS
+    GD -- "integrate into custom UI" --> SYS
+    PR -- "study documented protocol" --> SYS
+    SYS <-- "control & readback" --> DPS
 ```
 
-_Diagram is a placeholder — refine with actual interface details._
+## Technical Context
+
+```mermaid
+graph LR
+    User["User"]
+    App["3rd Party Application"]
+
+    subgraph System
+        SYS["fnirsi-ps-control"]
+    end
+
+    subgraph Hardware
+        DPS["FNIRSI DPS-150"]
+    end
+
+    User -- "CLI" <--> SYS
+    App -- "Python Library" <--> SYS
+    SYS -- "USB CDC ACM" <--> DPS
+```
+
