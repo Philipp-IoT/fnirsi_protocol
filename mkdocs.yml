@@ -43,6 +43,30 @@ nav:
       - API Reference: dev/api.md
       - Developer Setup: dev/setup.md
       - Contributing: dev/contributing.md
+  - Architecture (ARC42):
+      - Overview: arc42/index.md
+      - "1. Introduction and Goals": arc42/01_introduction_and_goals.md
+      - "2. Architecture Constraints": arc42/02_constraints.md
+      - "3. System Scope and Context": arc42/03_system_scope_and_context.md
+      - "4. Solution Strategy": arc42/04_solution_strategy.md
+      - "5. Building Block View": arc42/05_building_block_view.md
+      - "6. Runtime View": arc42/06_runtime_view.md
+      - "7. Deployment View": arc42/07_deployment_view.md
+      - "8. Cross-Cutting Concepts": arc42/08_crosscutting_concepts.md
+      - "9. Architecture Decisions": arc42/09_architecture_decisions.md
+      - "10. Quality Requirements": arc42/10_quality_requirements.md
+      - "11. Risks and Technical Debt": arc42/11_risks_and_technical_debt.md
+      - "12. Glossary": arc42/12_glossary.md
+  - ADRs:
+      - Overview: adr/index.md
+      - "ADR-001: Use ARC42": adr/ADR-001-use-arc42.md
+      - "ADR-002: Human-Authored Docs": adr/ADR-002-human-authored-docs.md
+      - "ADR-003: Vibe-Coding with Claude Code": adr/ADR-003-vibe-coding-claude-code.md
+      - "ADR-004: Git for Version Control": adr/ADR-004-git-version-control.md
+      - "ADR-005: GitHub for Hosting": adr/ADR-005-github-hosting.md
+      - "ADR-006: GitHub Actions for CI": adr/ADR-006-github-actions-ci.md
+      - "ADR-007: Conventional Commits": adr/ADR-007-conventional-commits.md
+      - "ADR-008: Semantic Release": adr/ADR-008-semantic-release.md
 
 markdown_extensions:
   - admonition

@@ -80,6 +80,23 @@ Pre-captured USB traffic logs live in `protocol/captures/`. The legacy implement
 
 ---
 
+## Documentation
+
+Install the docs dependencies and serve locally:
+
+```sh
+uv sync --extra docs
+uv run mkdocs serve
+```
+
+Build a static site into `site/`:
+
+```sh
+uv run mkdocs build
+```
+
+---
+
 ## Repository layout
 
 ```
