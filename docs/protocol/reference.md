@@ -16,6 +16,13 @@ Single source of truth: `protocol/fnirsi_dps150.ksy`
 
 ## Enumerations
 
+### `direction`
+
+| Value (hex) | Name           |
+| ----------- | -------------- |
+| `0xF0`      | device_to_host |
+| `0xF1`      | host_to_device |
+
 ### `start_byte`
 
 | Value (hex) | Name                |
@@ -60,24 +67,43 @@ Single source of truth: `protocol/fnirsi_dps150.ksy`
 
 ## Command Catalogue
 
-| Hex    | Name               | Payload type            | Description                                                |
-| ------ | ------------------ | ----------------------- | ---------------------------------------------------------- |
-| `0x00` | `connect_ctrl`     | `connect_payload`       | Payload for CMD connect_ctrl (0x00). DATA = 0x01 → [...]   |
-| `0xC0` | `push_vin_a`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC1` | `set_voltage`      | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC2` | `set_current`      | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC3` | `push_output`      | `push_output_payload`   | CMD 0xc3 – periodic output measurement push (LEN=12, [...] |
-| `0xC4` | `push_vin_c`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xDB` | `set_output`       | `output_enable_payload` | Payload for CMD set_output (0xdb). DATA = 0x01 → [...]     |
-| `0xDE` | `get_device_name`  | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xDF` | `get_fw_version`   | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xE0` | `get_hw_version`   | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xE1` | `ready_status`     | `ready_payload`         | Device ready status (CMD 0xe1).                            |
-| `0xE2` | `push_vin_b`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xE3` | `push_max_current` | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xFF` | `get_full_status`  | `full_status_payload`   | CMD 0xff – full status blob (LEN=0x8b = 139 bytes). [...]  |
+| Hex    | Name               | Payload type | Description |
+| ------ | ------------------ | ------------ | ----------- |
+| `0x00` | `connect_ctrl`     | `—`          |             |
+| `0xC0` | `push_vin_a`       | `—`          |             |
+| `0xC1` | `set_voltage`      | `—`          |             |
+| `0xC2` | `set_current`      | `—`          |             |
+| `0xC3` | `push_output`      | `—`          |             |
+| `0xC4` | `push_vin_c`       | `—`          |             |
+| `0xDB` | `set_output`       | `—`          |             |
+| `0xDE` | `get_device_name`  | `—`          |             |
+| `0xDF` | `get_fw_version`   | `—`          |             |
+| `0xE0` | `get_hw_version`   | `—`          |             |
+| `0xE1` | `ready_status`     | `—`          |             |
+| `0xE2` | `push_vin_b`       | `—`          |             |
+| `0xE3` | `push_max_current` | `—`          |             |
+| `0xFF` | `get_full_status`  | `—`          |             |
 
 ## Payload Types
+
+### `session_magic_body`
+
+Non-standard 4-byte payload of the session-start magic frame (START=0xb0).
+
+| Field   | Type | Description |
+| ------- | ---- | ----------- |
+| `magic` |      |             |
+
+### `command_body`
+
+Standard CMD/LEN/PAYLOAD/CHKSUM body used by all non-magic frames.
+
+| Field      | Type                    | Description                                                        |
+| ---------- | ----------------------- | ------------------------------------------------------------------ |
+| `cmd`      | u8 (enum: `command_id`) | Command / register identifier.                                     |
+| `length`   | u8                      | Byte length of the payload field.                                  |
+| `payload`  | payload (switch)        |                                                                    |
+| `checksum` | u8                      | (CMD + LEN + Σ DATA bytes) mod 256. Confirmed by capture analysis. |
 
 ### `output_enable_payload`
 
@@ -171,3 +197,7 @@ CHKSUM = (CMD + LEN + Σ DATA bytes) mod 256
 
 The `DIR` and `START` bytes are **excluded** from the checksum calculation.
 Confirmed by byte-exact comparison against captured frames.
+
+## Structure Diagram
+
+![Protocol structure diagram](fnirsi_dps150.svg)
