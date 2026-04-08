@@ -54,12 +54,16 @@ types:
       Non-standard 4-byte payload of the session-start magic frame (START=0xb0).
       Does not follow the CMD/LEN/DATA/CHKSUM format; checksum is absent.
       Wire (after DIR+START): 00 01 01 01 — confirmed from capture 2026-03-29.
+      Direction: TX only (host→device).
     seq:
       - id: magic
         contents: [0x00, 0x01, 0x01, 0x01]
 
   command_body:
-    doc: Standard CMD/LEN/PAYLOAD/CHKSUM body used by all non-magic frames.
+    doc: |
+      Standard CMD/LEN/PAYLOAD/CHKSUM body used by all non-magic frames.
+      The payload type is determined by both the direction (DIR) and the command
+      identifier (CMD): switch key = dir * 256 + cmd, so 0xf1xx = TX and 0xf0xx = RX.
     seq:
       - id: cmd
         type: u1
@@ -70,23 +74,44 @@ types:
         doc: Byte length of the payload field.
       - id: payload
         size: length
+        doc: |
+          Payload interpretation depends on direction and command.
+          TX queries (host→device) carry a single 0x00 placeholder byte (query_payload).
+          TX writes carry the value to set (float32 or byte).
+          RX responses carry the requested data.
+          RX pushes are unsolicited device→host measurements.
         type:
-          switch-on: cmd
+          switch-on: '_parent.dir.to_i * 256 + cmd.to_i'
           cases:
-            'command_id::connect_ctrl':    connect_payload
-            'command_id::ready_status':    ready_payload
-            'command_id::get_device_name': string_payload
-            'command_id::get_hw_version':  string_payload
-            'command_id::get_fw_version':  string_payload
-            'command_id::get_full_status': full_status_payload
-            'command_id::set_voltage':     float32_payload
-            'command_id::set_current':     float32_payload
-            'command_id::set_output':      output_enable_payload
-            'command_id::push_output':     push_output_payload
-            'command_id::push_vin_a':      float32_payload
-            'command_id::push_vin_b':      float32_payload
-            'command_id::push_max_current': float32_payload
-            'command_id::push_vin_c':      float32_payload
+            # -----------------------------------------------------------------
+            # TX — host→device (DIR = 0xf1)
+            # -----------------------------------------------------------------
+            0xf100: connect_payload        # connect_ctrl  TX: connect / disconnect
+            0xf1c1: float32_payload        # set_voltage   TX: set output voltage [V]
+            0xf1c2: float32_payload        # set_current   TX: set current limit [A]
+            0xf1db: output_enable_payload  # set_output    TX: enable / disable output
+            0xf1de: query_payload          # get_device_name TX query (data = 0x00)
+            0xf1df: query_payload          # get_fw_version  TX query
+            0xf1e0: query_payload          # get_hw_version  TX query
+            0xf1e1: query_payload          # ready_status    TX query (GET_READY poll)
+            0xf1ff: query_payload          # get_full_status TX query
+            # -----------------------------------------------------------------
+            # RX — device→host (DIR = 0xf0)
+            # -----------------------------------------------------------------
+            0xf000: connect_payload        # connect_ctrl  RX: device echo
+            0xf0c0: float32_payload        # push_vin_a    RX: input voltage measurement A [V]
+            0xf0c1: float32_payload        # set_voltage   RX: device echo [V]
+            0xf0c2: float32_payload        # set_current   RX: device echo [A]
+            0xf0c3: push_output_payload    # push_output   RX: unsolicited Vout/Iout/Pout push
+            0xf0c4: float32_payload        # push_vin_c    RX: input voltage measurement C [V]
+            0xf0db: output_enable_payload  # set_output    RX: device echo
+            0xf0de: string_payload         # get_device_name RX: ASCII device name
+            0xf0df: string_payload         # get_fw_version  RX: ASCII firmware version
+            0xf0e0: string_payload         # get_hw_version  RX: ASCII hardware version
+            0xf0e1: ready_payload          # ready_status    RX: device ready flag
+            0xf0e2: float32_payload        # push_vin_b    RX: input voltage measurement B [V]
+            0xf0e3: float32_payload        # push_max_current RX: maximum current [A]
+            0xf0ff: full_status_payload    # get_full_status  RX: full status blob
       - id: checksum
         type: u1
         doc: |
@@ -95,11 +120,21 @@ types:
   # ---------------------------------------------------------------------------
   # Payload types
   # ---------------------------------------------------------------------------
+  query_payload:
+    doc: |
+      TX query frame payload (LEN=1, DATA=0x00).
+      The host sends this to request a response; the device replies with a frame
+      using the same CMD code but with actual data (DIR=0xf0).
+    seq:
+      - id: reserved
+        type: u1
+        doc: Always 0x00.
+
   output_enable_payload:
     doc: |
       Payload for CMD set_output (0xdb).
-      DATA = 0x01 → enable output, DATA = 0x00 → disable output.
-      The device echoes the full frame back with START = 0xa1.
+      TX: DATA = 0x01 → enable output, DATA = 0x00 → disable output.
+      RX: device echoes the full frame back with START = 0xa1.
       Confirmed from capture dps150_connect_enable_out_set_v_set_i_disable_disconnect.txt.
     seq:
       - id: state
@@ -109,21 +144,26 @@ types:
   connect_payload:
     doc: |
       Payload for CMD connect_ctrl (0x00).
-      DATA = 0x01 → connect, DATA = 0x00 → disconnect.
+      TX: DATA = 0x01 → connect, DATA = 0x00 → disconnect.
+      RX: device echoes the connect/disconnect state.
     seq:
       - id: state
         type: u1
         enum: connect_state
 
   ready_payload:
-    doc: Device ready status (CMD 0xe1).
+    doc: |
+      RX payload for CMD ready_status (0xe1).
+      Device responds to a GET_READY query with this payload.
     seq:
       - id: ready
         type: u1
         doc: 0x01 = device ready, 0x00 = not ready.
 
   string_payload:
-    doc: Variable-length ASCII string (no NUL terminator).
+    doc: |
+      RX payload for string response commands (device name, HW/FW version).
+      Variable-length ASCII string (no NUL terminator).
     seq:
       - id: value
         type: str
@@ -138,7 +178,8 @@ types:
 
   push_output_payload:
     doc: |
-      CMD 0xc3 – periodic output measurement push (LEN=12, three floats).
+      RX payload for CMD push_output (0xc3) — periodic measurement push (LEN=12).
+      The device emits these unsolicited roughly every 600 ms during an active session.
       All values are 0.0 when output is disabled.
     seq:
       - id: vout
@@ -155,7 +196,7 @@ types:
 
   full_status_payload:
     doc: |
-      CMD 0xff – full status blob (LEN=0x8b = 139 bytes).
+      RX payload for CMD get_full_status (0xff) — full status blob (LEN=0x8b = 139 bytes).
       Offsets 0–95: 24 floats.  Offsets 96–138: mixed types (TBD).
     seq:
       - id: vin
@@ -231,20 +272,23 @@ enums:
     0xc1: connect_ctrl
 
   command_id:
-    0x00: connect_ctrl
-    0xc0: push_vin_a
-    0xc1: set_voltage
-    0xc2: set_current
-    0xc3: push_output
-    0xc4: push_vin_c
-    0xdb: set_output
+    # TX+RX — appear in both directions
+    0x00: connect_ctrl       # TX: connect/disconnect  RX: echo
+    0xc1: set_voltage        # TX: write [V]           RX: echo
+    0xc2: set_current        # TX: write [A]           RX: echo
+    0xdb: set_output         # TX: enable/disable      RX: echo
+    # TX only — host queries (response uses same CMD, DIR=0xf0)
     0xde: get_device_name
     0xdf: get_fw_version
     0xe0: get_hw_version
     0xe1: ready_status
+    0xff: get_full_status
+    # RX only — unsolicited device→host pushes
+    0xc0: push_vin_a
+    0xc3: push_output
+    0xc4: push_vin_c
     0xe2: push_vin_b
     0xe3: push_max_current
-    0xff: get_full_status
 
   connect_state:
     0x00: disconnect

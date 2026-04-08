@@ -98,12 +98,20 @@ Non-standard 4-byte payload of the session-start magic frame (START=0xb0).
 
 Standard CMD/LEN/PAYLOAD/CHKSUM body used by all non-magic frames.
 
-| Field      | Type                    | Description                                                        |
-| ---------- | ----------------------- | ------------------------------------------------------------------ |
-| `cmd`      | u8 (enum: `command_id`) | Command / register identifier.                                     |
-| `length`   | u8                      | Byte length of the payload field.                                  |
-| `payload`  | payload (switch)        |                                                                    |
-| `checksum` | u8                      | (CMD + LEN + Σ DATA bytes) mod 256. Confirmed by capture analysis. |
+| Field      | Type                    | Description                                                                                                                                                                                                                                                                            |
+| ---------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cmd`      | u8 (enum: `command_id`) | Command / register identifier.                                                                                                                                                                                                                                                         |
+| `length`   | u8                      | Byte length of the payload field.                                                                                                                                                                                                                                                      |
+| `payload`  | payload (switch)        | Payload interpretation depends on direction and command. TX queries (host→device) carry a single 0x00 placeholder byte (query_payload). TX writes carry the value to set (float32 or byte). RX responses carry the requested data. RX pushes are unsolicited device→host measurements. |
+| `checksum` | u8                      | (CMD + LEN + Σ DATA bytes) mod 256. Confirmed by capture analysis.                                                                                                                                                                                                                     |
+
+### `query_payload`
+
+TX query frame payload (LEN=1, DATA=0x00).
+
+| Field      | Type | Description  |
+| ---------- | ---- | ------------ |
+| `reserved` | u8   | Always 0x00. |
 
 ### `output_enable_payload`
 
@@ -123,7 +131,7 @@ Payload for CMD connect_ctrl (0x00).
 
 ### `ready_payload`
 
-Device ready status (CMD 0xe1).
+RX payload for CMD ready_status (0xe1).
 
 | Field   | Type | Description                            |
 | ------- | ---- | -------------------------------------- |
@@ -131,7 +139,7 @@ Device ready status (CMD 0xe1).
 
 ### `string_payload`
 
-Variable-length ASCII string (no NUL terminator).
+RX payload for string response commands (device name, HW/FW version).
 
 | Field   | Type         | Description |
 | ------- | ------------ | ----------- |
@@ -147,7 +155,7 @@ Single IEEE 754 32-bit LE float (voltage in V or current in A).
 
 ### `push_output_payload`
 
-CMD 0xc3 – periodic output measurement push (LEN=12, three floats).
+RX payload for CMD push_output (0xc3) — periodic measurement push (LEN=12).
 
 | Field  | Type   | Description                                                                                             |
 | ------ | ------ | ------------------------------------------------------------------------------------------------------- |
@@ -157,7 +165,7 @@ CMD 0xc3 – periodic output measurement push (LEN=12, three floats).
 
 ### `full_status_payload`
 
-CMD 0xff – full status blob (LEN=0x8b = 139 bytes).
+RX payload for CMD get_full_status (0xff) — full status blob (LEN=0x8b = 139 bytes).
 
 | Field         | Type         | Description                                        |
 | ------------- | ------------ | -------------------------------------------------- |
