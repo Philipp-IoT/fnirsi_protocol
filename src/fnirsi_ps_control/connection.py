@@ -81,18 +81,17 @@ class SerialConnection:
     # ------------------------------------------------------------------
 
     def write(self, data: bytes) -> None:
-        """Write *data*, prepending the ``0xf1`` TX direction byte.
+        """Write *data* to the serial port.
 
-        Every host→device frame on the wire starts with ``0xf1`` (confirmed
-        from USBPcap raw bulk payloads — it is part of the application protocol,
-        not a USB-layer artefact).
+        The caller is responsible for including the ``0xf1`` TX direction byte
+        as the first byte of *data* — use :meth:`~protocol.Frame.encode` or
+        :func:`~protocol.encode_session_magic` which both include the DIR prefix.
         """
         if not self._serial or not self._serial.is_open:
             raise ConnectionError("Port is not open")
         try:
-            wire = b"\xf1" + data
-            self._serial.write(wire)
-            log.debug("TX (%d B): %s", len(wire), wire.hex(" "))
+            self._serial.write(data)
+            log.debug("TX (%d B): %s", len(data), data.hex(" "))
         except serial.SerialException as exc:
             raise ConnectionError(f"Write error: {exc}") from exc
 
@@ -112,8 +111,8 @@ class SerialConnection:
 
         Wire format: ``[DIR:1][START:1][CMD:1][LEN:1][DATA:LEN][CHKSUM:1]``
 
-        Consumes and discards the ``0xf0`` direction prefix.  Returns
-        ``[START][CMD][LEN][DATA][CHKSUM]`` ready for :func:`~protocol.parse_frame`.
+        Returns the full frame including the ``0xf0`` direction prefix, ready
+        for :func:`~protocol.parse_frame`.
 
         Raises
         ------
@@ -129,7 +128,7 @@ class SerialConnection:
         tail = self.read(length + 1)  # DATA + CHKSUM
         if len(tail) < length + 1:
             raise TimeoutError("Timeout reading frame body")
-        return header[1:] + tail  # strip DIR, return START..CHKSUM
+        return header + tail  # full frame: DIR..CHKSUM
 
     def flush(self) -> None:
         """Flush RX and TX buffers."""

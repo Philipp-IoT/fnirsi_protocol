@@ -31,6 +31,10 @@ class FnirsiDps150(KaitaiStruct):
         disconnect = 0
         connect = 1
 
+    class Direction(IntEnum):
+        device_to_host = 240
+        host_to_device = 241
+
     class OutputState(IntEnum):
         disabled = 0
         enabled = 1
@@ -54,50 +58,15 @@ class FnirsiDps150(KaitaiStruct):
         pass
         self.frame._fetch_instances()
 
-    class ConnectPayload(KaitaiStruct):
-        """Payload for CMD connect_ctrl (0x00).
-        DATA = 0x01 → connect, DATA = 0x00 → disconnect.
-        """
+    class CommandBody(KaitaiStruct):
+        """Standard CMD/LEN/PAYLOAD/CHKSUM body used by all non-magic frames."""
         def __init__(self, _io, _parent=None, _root=None):
-            super(FnirsiDps150.ConnectPayload, self).__init__(_io)
+            super(FnirsiDps150.CommandBody, self).__init__(_io)
             self._parent = _parent
             self._root = _root
             self._read()
 
         def _read(self):
-            self.state = KaitaiStream.resolve_enum(FnirsiDps150.ConnectState, self._io.read_u1())
-
-
-        def _fetch_instances(self):
-            pass
-
-
-    class Float32Payload(KaitaiStruct):
-        """Single IEEE 754 32-bit LE float (voltage in V or current in A)."""
-        def __init__(self, _io, _parent=None, _root=None):
-            super(FnirsiDps150.Float32Payload, self).__init__(_io)
-            self._parent = _parent
-            self._root = _root
-            self._read()
-
-        def _read(self):
-            self.value = self._io.read_f4le()
-
-
-        def _fetch_instances(self):
-            pass
-
-
-    class Frame(KaitaiStruct):
-        """Top-level protocol frame."""
-        def __init__(self, _io, _parent=None, _root=None):
-            super(FnirsiDps150.Frame, self).__init__(_io)
-            self._parent = _parent
-            self._root = _root
-            self._read()
-
-        def _read(self):
-            self.start = KaitaiStream.resolve_enum(FnirsiDps150.StartByte, self._io.read_u1())
             self.cmd = KaitaiStream.resolve_enum(FnirsiDps150.CommandId, self._io.read_u1())
             self.length = self._io.read_u1()
             _on = self.cmd
@@ -226,6 +195,71 @@ class FnirsiDps150(KaitaiStruct):
                 pass
 
 
+    class ConnectPayload(KaitaiStruct):
+        """Payload for CMD connect_ctrl (0x00).
+        DATA = 0x01 → connect, DATA = 0x00 → disconnect.
+        """
+        def __init__(self, _io, _parent=None, _root=None):
+            super(FnirsiDps150.ConnectPayload, self).__init__(_io)
+            self._parent = _parent
+            self._root = _root
+            self._read()
+
+        def _read(self):
+            self.state = KaitaiStream.resolve_enum(FnirsiDps150.ConnectState, self._io.read_u1())
+
+
+        def _fetch_instances(self):
+            pass
+
+
+    class Float32Payload(KaitaiStruct):
+        """Single IEEE 754 32-bit LE float (voltage in V or current in A)."""
+        def __init__(self, _io, _parent=None, _root=None):
+            super(FnirsiDps150.Float32Payload, self).__init__(_io)
+            self._parent = _parent
+            self._root = _root
+            self._read()
+
+        def _read(self):
+            self.value = self._io.read_f4le()
+
+
+        def _fetch_instances(self):
+            pass
+
+
+    class Frame(KaitaiStruct):
+        """Full wire frame including direction prefix."""
+        def __init__(self, _io, _parent=None, _root=None):
+            super(FnirsiDps150.Frame, self).__init__(_io)
+            self._parent = _parent
+            self._root = _root
+            self._read()
+
+        def _read(self):
+            self.dir = KaitaiStream.resolve_enum(FnirsiDps150.Direction, self._io.read_u1())
+            self.start = KaitaiStream.resolve_enum(FnirsiDps150.StartByte, self._io.read_u1())
+            _on = self.start
+            if _on == FnirsiDps150.StartByte.start_session_magic:
+                pass
+                self.body = FnirsiDps150.SessionMagicBody(self._io, self, self._root)
+            else:
+                pass
+                self.body = FnirsiDps150.CommandBody(self._io, self, self._root)
+
+
+        def _fetch_instances(self):
+            pass
+            _on = self.start
+            if _on == FnirsiDps150.StartByte.start_session_magic:
+                pass
+                self.body._fetch_instances()
+            else:
+                pass
+                self.body._fetch_instances()
+
+
     class FullStatusPayload(KaitaiStruct):
         """CMD 0xff – full status blob (LEN=0x8b = 139 bytes).
         Offsets 0–95: 24 floats.  Offsets 96–138: mixed types (TBD).
@@ -333,6 +367,27 @@ class FnirsiDps150(KaitaiStruct):
 
         def _read(self):
             self.ready = self._io.read_u1()
+
+
+        def _fetch_instances(self):
+            pass
+
+
+    class SessionMagicBody(KaitaiStruct):
+        """Non-standard 4-byte payload of the session-start magic frame (START=0xb0).
+        Does not follow the CMD/LEN/DATA/CHKSUM format; checksum is absent.
+        Wire (after DIR+START): 00 01 01 01 — confirmed from capture 2026-03-29.
+        """
+        def __init__(self, _io, _parent=None, _root=None):
+            super(FnirsiDps150.SessionMagicBody, self).__init__(_io)
+            self._parent = _parent
+            self._root = _root
+            self._read()
+
+        def _read(self):
+            self.magic = self._io.read_bytes(4)
+            if not self.magic == b"\x00\x01\x01\x01":
+                raise kaitaistruct.ValidationNotEqualError(b"\x00\x01\x01\x01", self.magic, self._io, u"/types/session_magic_body/seq/0")
 
 
         def _fetch_instances(self):

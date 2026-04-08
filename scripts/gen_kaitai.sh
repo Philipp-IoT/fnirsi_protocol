@@ -21,3 +21,6 @@ echo "Generated: ${OUTDIR}/fnirsi_dps150.dot"
 
 dot -Tsvg "${OUTDIR}/fnirsi_dps150.dot" -o "${OUTDIR}/fnirsi_dps150.svg"
 echo "Generated: ${OUTDIR}/fnirsi_dps150.svg"
+
+cp "${OUTDIR}/fnirsi_dps150.svg" "${ROOT}/docs/protocol/fnirsi_dps150.svg"
+echo "Copied SVG: docs/protocol/fnirsi_dps150.svg"

@@ -204,6 +204,17 @@ def render_checksum() -> str:
     )
 
 
+def render_diagram() -> str:
+    return "\n".join(
+        [
+            "## Structure Diagram",
+            "",
+            "![Protocol structure diagram](fnirsi_dps150.svg)",
+            "",
+        ]
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -234,6 +245,7 @@ def main() -> None:
         render_commands(ksy),
         render_types(ksy),
         render_checksum(),
+        render_diagram(),
     ]
     content = "\n".join(sections)
 

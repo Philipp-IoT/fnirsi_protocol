@@ -7,9 +7,11 @@
 #   CHKSUM : (CMD + LEN + Σ DATA) mod 256  (DIR and START excluded)
 #   Values : IEEE 754 32-bit little-endian float for voltage / current
 #
+# Exception: the session-start magic frame (START=0xb0) uses a non-standard
+# 4-byte body without CMD/LEN/CHKSUM — see session_magic_body below.
+#
 # The DIR byte is part of the serial data stream, NOT a USB-layer
 # artefact (confirmed from Windows USBPcap raw bulk payloads).
-# This spec describes the application frame AFTER stripping the DIR byte.
 #
 # Status: CONFIRMED from capture and live hardware test 2026-03-29
 # USB: VID 0x2e3c (Artery) / PID 0x5740 (AT32 Virtual Com Port)
@@ -29,12 +31,36 @@ seq:
 
 types:
   frame:
-    doc: Top-level protocol frame.
+    doc: Full wire frame including direction prefix.
     seq:
+      - id: dir
+        type: u1
+        enum: direction
+        doc: Direction byte — 0xf1 host→device, 0xf0 device→host.
       - id: start
         type: u1
         enum: start_byte
         doc: Packet type identifier.
+      - id: body
+        doc: Frame body — structure depends on start byte.
+        type:
+          switch-on: start
+          cases:
+            'start_byte::start_session_magic': session_magic_body
+            _: command_body
+
+  session_magic_body:
+    doc: |
+      Non-standard 4-byte payload of the session-start magic frame (START=0xb0).
+      Does not follow the CMD/LEN/DATA/CHKSUM format; checksum is absent.
+      Wire (after DIR+START): 00 01 01 01 — confirmed from capture 2026-03-29.
+    seq:
+      - id: magic
+        contents: [0x00, 0x01, 0x01, 0x01]
+
+  command_body:
+    doc: Standard CMD/LEN/PAYLOAD/CHKSUM body used by all non-magic frames.
+    seq:
       - id: cmd
         type: u1
         enum: command_id
@@ -194,6 +220,10 @@ types:
         doc: Preset current limit [A].
 
 enums:
+  direction:
+    0xf0: device_to_host
+    0xf1: host_to_device
+
   start_byte:
     0xa1: query_or_response
     0xb0: start_session_magic
