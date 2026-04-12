@@ -60,22 +60,459 @@ Single source of truth: `protocol/fnirsi_dps150.ksy`
 
 ## Command Catalogue
 
-| Hex    | Name               | Payload type            | Description                                                |
-| ------ | ------------------ | ----------------------- | ---------------------------------------------------------- |
-| `0x00` | `connect_ctrl`     | `connect_payload`       | Payload for CMD connect_ctrl (0x00). DATA = 0x01 → [...]   |
-| `0xC0` | `push_vin_a`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC1` | `set_voltage`      | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC2` | `set_current`      | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC3` | `push_output`      | `push_output_payload`   | CMD 0xc3 – periodic output measurement push (LEN=12, [...] |
-| `0xC4` | `push_vin_c`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xDB` | `set_output`       | `output_enable_payload` | Payload for CMD set_output (0xdb). DATA = 0x01 → [...]     |
-| `0xDE` | `get_device_name`  | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xDF` | `get_fw_version`   | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xE0` | `get_hw_version`   | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xE1` | `ready_status`     | `ready_payload`         | Device ready status (CMD 0xe1).                            |
-| `0xE2` | `push_vin_b`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xE3` | `push_max_current` | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xFF` | `get_full_status`  | `full_status_payload`   | CMD 0xff – full status blob (LEN=0x8b = 139 bytes). [...]  |
+| Hex    | Name               | Payload type            | Direction     | Response          | Description                                                |
+| ------ | ------------------ | ----------------------- | ------------- | ----------------- | ---------------------------------------------------------- |
+| `0x00` | `connect_ctrl`     | `connect_payload`       | host → device | —                 | Payload for CMD connect_ctrl (0x00). DATA = 0x01 → [...]   |
+| `0xC0` | `push_vin_a`       | `float32_payload`       | device → host | unsolicited push  | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
+| `0xC1` | `set_voltage`      | `float32_payload`       | host → device | —                 | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
+| `0xC2` | `set_current`      | `float32_payload`       | host → device | —                 | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
+| `0xC3` | `push_output`      | `push_output_payload`   | device → host | unsolicited push  | CMD 0xc3 – periodic output measurement push (LEN=12, [...] |
+| `0xC4` | `push_vin_c`       | `float32_payload`       | device → host | unsolicited push  | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
+| `0xDB` | `set_output`       | `output_enable_payload` | host → device | `set_output`      | Payload for CMD set_output (0xdb). DATA = 0x01 → [...]     |
+| `0xDE` | `get_device_name`  | `string_payload`        | host → device | `get_device_name` | Variable-length ASCII string (no NUL terminator).          |
+| `0xDF` | `get_fw_version`   | `string_payload`        | host → device | `get_fw_version`  | Variable-length ASCII string (no NUL terminator).          |
+| `0xE0` | `get_hw_version`   | `string_payload`        | host → device | `get_hw_version`  | Variable-length ASCII string (no NUL terminator).          |
+| `0xE1` | `ready_status`     | `ready_payload`         | both          | `ready_status`    | Device ready status (CMD 0xe1).                            |
+| `0xE2` | `push_vin_b`       | `float32_payload`       | device → host | unsolicited push  | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
+| `0xE3` | `push_max_current` | `float32_payload`       | device → host | unsolicited push  | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
+| `0xFF` | `get_full_status`  | `full_status_payload`   | host → device | `get_full_status` | CMD 0xff – full status blob (LEN=0x8b = 139 bytes). [...]  |
+
+## Command Sequences
+
+!!! info "Source"
+    Sequence data is defined in `protocol/sequences.yaml` and auto-generated here.
+    For narrative context, timing diagrams, and wire-level examples
+    see [Session Lifecycle](session.md).
+
+### Connection Handshake
+
+#### `connect_handshake`
+
+Mandatory three-step handshake to establish a session.
+Must complete before any active-session command is issued.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] connect_ctrl: f1 c1 00 01 01 02
+    Note over H,D: connect
+    Note over H: Wait 200 ms
+    loop up to 10× / 100 ms
+        H->>D: [TX] ready_status: f1 a1 e1 01 00 e2
+        D-->>H: [RX] ready_status: f0 a1 e1 01 01 e3
+    end
+    Note over H,D: poll
+    H->>D: [TX] start_session_magic: f1 b0 00 01 01 01
+    Note over H,D: opaque constant
+```
+
+```
+TX: f1 c1 00 01 01 02
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xc1  (connect_ctrl)
+    ├─ CMD   = 0x00  (connect_ctrl)
+    ├─ LEN   = 1
+    ├─ DATA  = 01  →  connect
+    └─ CHK   = 0x02  (= (0x00 + 1 + 0x01) mod 256)
+```
+
+```
+TX: f1 a1 e1 01 00 e2
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xe1  (ready_status)
+    ├─ LEN   = 1
+    ├─ DATA  = 00  →  poll
+    └─ CHK   = 0xe2  (= (0xe1 + 1 + 0x00) mod 256)
+RX: f0 a1 e1 01 01 e3
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xe1  (ready_status)
+    ├─ LEN   = 1
+    ├─ DATA  = 01  →  ready = 1
+    └─ CHK   = 0xe3  (= (0xe1 + 1 + 0x01) mod 256)
+```
+
+```
+TX: f1 b0 00 01 01 01
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xb0  (start_session_magic)
+    ├─ CMD   = 0x00  (connect_ctrl)
+    ├─ LEN   = 1
+    ├─ DATA  = 01  →  opaque constant
+    └─ CHK   = 0x01  (non-standard — send as opaque constant)
+```
+
+| Step | Direction     | CMD                   | Payload / timing               | Response                    | Notes                                                                             |
+| ---- | ------------- | --------------------- | ------------------------------ | --------------------------- | --------------------------------------------------------------------------------- |
+| 1    | host → device | `connect_ctrl`        | data=0x01                      | —                           | Wake the device. No response expected.                                            |
+| 2    | delay         | —                     | 200 ms                         | —                           | Allow device initialisation time before polling.                                  |
+| 3    | host → device | `ready_status`        | data=0x00 (retry ×10 / 100 ms) | `ready_status` — ready == 1 | Poll until device signals ready. Retry up to 10× with 100 ms delay.               |
+| 4    | host → device | `start_session_magic` | b0 00 01 01 01                 | —                           | Opaque 5-byte constant. START=0xb0, non-standard checksum. Send as literal bytes. |
+
+### Active Session
+
+#### `set_voltage`
+
+Set the output voltage set-point. Fire-and-forget — no response.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] set_voltage: f1 b1 c1 04 00 00 40 41 46
+    Note over H,D: 12.0 V
+```
+
+```
+TX: f1 b1 c1 04 00 00 40 41 46
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xb1  (write_command)
+    ├─ CMD   = 0xc1  (set_voltage)
+    ├─ LEN   = 4
+    ├─ DATA  = 00 00 40 41  →  12.0 V
+    └─ CHK   = 0x46  (= (0xc1 + 4 + 0x00 + 0x00 + 0x40 + 0x41) mod 256)
+```
+
+| Step | Direction     | CMD           | Payload / timing | Response | Notes |
+| ---- | ------------- | ------------- | ---------------- | -------- | ----- |
+| 1    | host → device | `set_voltage` | float32 [V]      | —        |       |
+
+#### `set_current`
+
+Set the current limit. Fire-and-forget — no response.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] set_current: f1 b1 c2 04 00 00 c0 3f c5
+    Note over H,D: 1.5 A
+```
+
+```
+TX: f1 b1 c2 04 00 00 c0 3f c5
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xb1  (write_command)
+    ├─ CMD   = 0xc2  (set_current)
+    ├─ LEN   = 4
+    ├─ DATA  = 00 00 c0 3f  →  1.5 A
+    └─ CHK   = 0xc5  (= (0xc2 + 4 + 0x00 + 0x00 + 0xc0 + 0x3f) mod 256)
+```
+
+| Step | Direction     | CMD           | Payload / timing | Response | Notes |
+| ---- | ------------- | ------------- | ---------------- | -------- | ----- |
+| 1    | host → device | `set_current` | float32 [A]      | —        |       |
+
+#### `set_output_enable`
+
+Enable the power output.
+The device echoes the full frame back with START=0xa1.
+This is the only write command that elicits a response.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] set_output: f1 b1 db 01 01 dd
+    D-->>H: [RX] set_output: f0 a1 db 01 01 dd
+    Note over H,D: output enabled
+```
+
+```
+TX: f1 b1 db 01 01 dd
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xb1  (write_command)
+    ├─ CMD   = 0xdb  (set_output)
+    ├─ LEN   = 1
+    ├─ DATA  = 01  →  output enabled
+    └─ CHK   = 0xdd  (= (0xdb + 1 + 0x01) mod 256)
+RX: f0 a1 db 01 01 dd
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xdb  (set_output)
+    ├─ LEN   = 1
+    ├─ DATA  = 01  →  echo — DATA=0x01 (enabled)
+    └─ CHK   = 0xdd  (= (0xdb + 1 + 0x01) mod 256)
+```
+
+| Step | Direction     | CMD          | Payload / timing | Response                               | Notes                                     |
+| ---- | ------------- | ------------ | ---------------- | -------------------------------------- | ----------------------------------------- |
+| 1    | host → device | `set_output` | data=0x01        | `set_output` — same payload as request | Echo uses START=0xa1 (query_or_response). |
+
+#### `set_output_disable`
+
+Disable the power output.
+The device echoes the full frame back with START=0xa1.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] set_output: f1 b1 db 01 00 dc
+    D-->>H: [RX] set_output: f0 a1 db 01 00 dc
+    Note over H,D: output disabled
+```
+
+```
+TX: f1 b1 db 01 00 dc
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xb1  (write_command)
+    ├─ CMD   = 0xdb  (set_output)
+    ├─ LEN   = 1
+    ├─ DATA  = 00  →  output disabled
+    └─ CHK   = 0xdc  (= (0xdb + 1 + 0x00) mod 256)
+RX: f0 a1 db 01 00 dc
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xdb  (set_output)
+    ├─ LEN   = 1
+    ├─ DATA  = 00  →  echo — DATA=0x00 (disabled)
+    └─ CHK   = 0xdc  (= (0xdb + 1 + 0x00) mod 256)
+```
+
+| Step | Direction     | CMD          | Payload / timing | Response                               | Notes                                     |
+| ---- | ------------- | ------------ | ---------------- | -------------------------------------- | ----------------------------------------- |
+| 1    | host → device | `set_output` | data=0x00        | `set_output` — same payload as request | Echo uses START=0xa1 (query_or_response). |
+
+#### `get_full_status`
+
+Query the complete device state blob (139 bytes).
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] get_full_status: f1 a1 ff 01 00 00
+    D-->>H: [RX] get_full_status: f0 a1 ff 8b ... ...
+    Note over H,D: query
+```
+
+```
+TX: f1 a1 ff 01 00 00
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xff  (get_full_status)
+    ├─ LEN   = 1
+    ├─ DATA  = 00  →  query
+    └─ CHK   = 0x00  (= (0xff + 1 + 0x00) mod 256)
+RX: f0 a1 ff 8b ...  (truncated — 139-byte status blob)
+```
+
+| Step | Direction     | CMD               | Payload / timing | Response          | Notes                                                     |
+| ---- | ------------- | ----------------- | ---------------- | ----------------- | --------------------------------------------------------- |
+| 1    | host → device | `get_full_status` | data=0x00        | `get_full_status` | Response may be interleaved with unsolicited push frames. |
+
+#### `get_device_name`
+
+Query device name. Response is an ASCII string.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] get_device_name: f1 a1 de 01 00 df
+    D-->>H: [RX] get_device_name: f0 a1 de 07 44 50 53 2d 31 35 30 8f
+    Note over H,D: query
+```
+
+```
+TX: f1 a1 de 01 00 df
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xde  (get_device_name)
+    ├─ LEN   = 1
+    ├─ DATA  = 00  →  query
+    └─ CHK   = 0xdf  (= (0xde + 1 + 0x00) mod 256)
+RX: f0 a1 de 07 44 50 53 2d 31 35 30 8f
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xde  (get_device_name)
+    ├─ LEN   = 7
+    ├─ DATA  = 44 50 53 2d 31 35 30  →  "DPS-150" (7 ASCII bytes)
+    └─ CHK   = 0x8f  (= (0xde + 7 + 0x44 + 0x50 + 0x53 + 0x2d + 0x31 + 0x35 + 0x30) mod 256)
+```
+
+| Step | Direction     | CMD               | Payload / timing | Response          | Notes |
+| ---- | ------------- | ----------------- | ---------------- | ----------------- | ----- |
+| 1    | host → device | `get_device_name` | data=0x00        | `get_device_name` |       |
+
+#### `get_hw_version`
+
+Query hardware version. Response is an ASCII string.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] get_hw_version: f1 a1 e0 01 00 e1
+    D-->>H: [RX] get_hw_version: f0 a1 e0 04 56 31 2e 32 cb
+    Note over H,D: query
+```
+
+```
+TX: f1 a1 e0 01 00 e1
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xe0  (get_hw_version)
+    ├─ LEN   = 1
+    ├─ DATA  = 00  →  query
+    └─ CHK   = 0xe1  (= (0xe0 + 1 + 0x00) mod 256)
+RX: f0 a1 e0 04 56 31 2e 32 cb
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xe0  (get_hw_version)
+    ├─ LEN   = 4
+    ├─ DATA  = 56 31 2e 32  →  "V1.2" (4 ASCII bytes)
+    └─ CHK   = 0xcb  (= (0xe0 + 4 + 0x56 + 0x31 + 0x2e + 0x32) mod 256)
+```
+
+| Step | Direction     | CMD              | Payload / timing | Response         | Notes |
+| ---- | ------------- | ---------------- | ---------------- | ---------------- | ----- |
+| 1    | host → device | `get_hw_version` | data=0x00        | `get_hw_version` |       |
+
+#### `get_fw_version`
+
+Query firmware version. Response is an ASCII string.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] get_fw_version: f1 a1 df 01 00 e0
+    D-->>H: [RX] get_fw_version: f0 a1 df 04 56 31 2e 30 c8
+    Note over H,D: query
+```
+
+```
+TX: f1 a1 df 01 00 e0
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xdf  (get_fw_version)
+    ├─ LEN   = 1
+    ├─ DATA  = 00  →  query
+    └─ CHK   = 0xe0  (= (0xdf + 1 + 0x00) mod 256)
+RX: f0 a1 df 04 56 31 2e 30 c8
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xdf  (get_fw_version)
+    ├─ LEN   = 4
+    ├─ DATA  = 56 31 2e 30  →  "V1.0" (4 ASCII bytes)
+    └─ CHK   = 0xc8  (= (0xdf + 4 + 0x56 + 0x31 + 0x2e + 0x30) mod 256)
+```
+
+| Step | Direction     | CMD              | Payload / timing | Response         | Notes |
+| ---- | ------------- | ---------------- | ---------------- | ---------------- | ----- |
+| 1    | host → device | `get_fw_version` | data=0x00        | `get_fw_version` |       |
+
+#### `push_stream`
+
+Unsolicited periodic data push from device to host, approximately every
+600 ms. No request frame is needed; the device emits these automatically
+once the connect handshake completes.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    D-->>H: [RX] push_vin_a: f0 a1 c0 04 00 00 a0 41 a5
+    Note over H,D: 20.0 V
+    D-->>H: [RX] push_output: f0 a1 c3 0c 00 00 a0 40 00 00 80 3f 00 00 a0 40 4e
+    Note over H,D: Vout=5.0 V, Iout=1.0 A, Pout=5.0 W
+    D-->>H: [RX] push_vin_b: f0 a1 e2 04 00 00 a0 41 c7
+    Note over H,D: 20.0 V
+    D-->>H: [RX] push_max_current: f0 a1 e3 04 33 33 a3 40 30
+    Note over H,D: 5.1 A
+    D-->>H: [RX] push_vin_c: f0 a1 c4 04 00 00 c0 41 c9
+    Note over H,D: 24.0 V
+```
+
+```
+RX: f0 a1 c0 04 00 00 a0 41 a5
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xc0  (push_vin_a)
+    ├─ LEN   = 4
+    ├─ DATA  = 00 00 a0 41  →  20.0 V
+    └─ CHK   = 0xa5  (= (0xc0 + 4 + 0x00 + 0x00 + 0xa0 + 0x41) mod 256)
+```
+
+```
+RX: f0 a1 c3 0c 00 00 a0 40 00 00 80 3f 00 00 a0 40 4e
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xc3  (push_output)
+    ├─ LEN   = 12
+    ├─ DATA  = 00 00 a0 40 00 00 80 3f 00 00 a0 40  →  Vout=5.0 V, Iout=1.0 A, Pout=5.0 W
+    └─ CHK   = 0x4e  (= (0xc3 + 12 + 0x00 + 0x00 + 0xa0 + 0x40 + 0x00 + 0x00 + 0x80 + 0x3f + 0x00 + 0x00 + 0xa0 + 0x40) mod 256)
+```
+
+```
+RX: f0 a1 e2 04 00 00 a0 41 c7
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xe2  (push_vin_b)
+    ├─ LEN   = 4
+    ├─ DATA  = 00 00 a0 41  →  20.0 V
+    └─ CHK   = 0xc7  (= (0xe2 + 4 + 0x00 + 0x00 + 0xa0 + 0x41) mod 256)
+```
+
+```
+RX: f0 a1 e3 04 33 33 a3 40 30
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xe3  (push_max_current)
+    ├─ LEN   = 4
+    ├─ DATA  = 33 33 a3 40  →  5.1 A
+    └─ CHK   = 0x30  (= (0xe3 + 4 + 0x33 + 0x33 + 0xa3 + 0x40) mod 256)
+```
+
+```
+RX: f0 a1 c4 04 00 00 c0 41 c9
+    ├─ DIR   = 0xf0  (device → host)
+    ├─ START = 0xa1  (query_or_response)
+    ├─ CMD   = 0xc4  (push_vin_c)
+    ├─ LEN   = 4
+    ├─ DATA  = 00 00 c0 41  →  24.0 V
+    └─ CHK   = 0xc9  (= (0xc4 + 4 + 0x00 + 0x00 + 0xc0 + 0x41) mod 256)
+```
+
+| Step | Direction     | CMD                | Payload / timing | Response | Notes                                    |
+| ---- | ------------- | ------------------ | ---------------- | -------- | ---------------------------------------- |
+| 1    | device → host | `push_vin_a`       | — (~600 ms)      | —        | Input voltage channel A [V].             |
+| 2    | device → host | `push_output`      | — (~600 ms)      | —        | Vout [V], Iout [A], Pout [W].            |
+| 3    | device → host | `push_vin_b`       | — (~600 ms)      | —        | Alternate input voltage measurement [V]. |
+| 4    | device → host | `push_max_current` | — (~600 ms)      | —        | Device maximum current constant (5.1 A). |
+| 5    | device → host | `push_vin_c`       | — (~600 ms)      | —        | Boost rail voltage [V].                  |
+
+### Disconnection
+
+#### `disconnect`
+
+Terminate the session. No response expected. Close the serial port after sending.
+
+```mermaid
+sequenceDiagram
+    participant H as Host
+    participant D as DPS-150
+    H->>D: [TX] connect_ctrl: f1 c1 00 01 00 01
+    Note over H,D: disconnect
+```
+
+```
+TX: f1 c1 00 01 00 01
+    ├─ DIR   = 0xf1  (host → device)
+    ├─ START = 0xc1  (connect_ctrl)
+    ├─ CMD   = 0x00  (connect_ctrl)
+    ├─ LEN   = 1
+    ├─ DATA  = 00  →  disconnect
+    └─ CHK   = 0x01  (= (0x00 + 1 + 0x00) mod 256)
+```
+
+| Step | Direction     | CMD            | Payload / timing | Response | Notes                                    |
+| ---- | ------------- | -------------- | ---------------- | -------- | ---------------------------------------- |
+| 1    | host → device | `connect_ctrl` | data=0x00        | —        | Mirror of connect step 1 with data=0x00. |
 
 ## Payload Types
 
