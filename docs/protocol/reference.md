@@ -16,6 +16,13 @@ Single source of truth: `protocol/fnirsi_dps150.ksy`
 
 ## Enumerations
 
+### `direction`
+
+| Value (hex) | Name           |
+| ----------- | -------------- |
+| `0xF0`      | device_to_host |
+| `0xF1`      | host_to_device |
+
 ### `start_byte`
 
 | Value (hex) | Name                |
@@ -60,24 +67,44 @@ Single source of truth: `protocol/fnirsi_dps150.ksy`
 
 ## Command Catalogue
 
-| Hex    | Name               | Payload type            | Description                                                |
-| ------ | ------------------ | ----------------------- | ---------------------------------------------------------- |
-| `0x00` | `connect_ctrl`     | `connect_payload`       | Payload for CMD connect_ctrl (0x00). DATA = 0x01 → [...]   |
-| `0xC0` | `push_vin_a`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC1` | `set_voltage`      | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC2` | `set_current`      | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xC3` | `push_output`      | `push_output_payload`   | CMD 0xc3 – periodic output measurement push (LEN=12, [...] |
-| `0xC4` | `push_vin_c`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xDB` | `set_output`       | `output_enable_payload` | Payload for CMD set_output (0xdb). DATA = 0x01 → [...]     |
-| `0xDE` | `get_device_name`  | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xDF` | `get_fw_version`   | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xE0` | `get_hw_version`   | `string_payload`        | Variable-length ASCII string (no NUL terminator).          |
-| `0xE1` | `ready_status`     | `ready_payload`         | Device ready status (CMD 0xe1).                            |
-| `0xE2` | `push_vin_b`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xE3` | `push_max_current` | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...]     |
-| `0xFF` | `get_full_status`  | `full_status_payload`   | CMD 0xff – full status blob (LEN=0x8b = 139 bytes). [...]  |
+| CMD    | Name               | Direction | TX Payload              | RX Payload              | Description                                            |
+| ------ | ------------------ | --------- | ----------------------- | ----------------------- | ------------------------------------------------------ |
+| `0x00` | `connect_ctrl`     | TX + RX   | `connect_payload`       | `connect_payload`       | Payload for CMD connect_ctrl (0x00).                   |
+| `0xC0` | `push_vin_a`       | RX        | —                       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...] |
+| `0xC1` | `set_voltage`      | TX + RX   | `float32_payload`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...] |
+| `0xC2` | `set_current`      | TX + RX   | `float32_payload`       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...] |
+| `0xC3` | `push_output`      | RX        | —                       | `push_output_payload`   | RX payload for CMD push_output (0xc3) — periodic [...] |
+| `0xC4` | `push_vin_c`       | RX        | —                       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...] |
+| `0xDB` | `set_output`       | TX + RX   | `output_enable_payload` | `output_enable_payload` | Payload for CMD set_output (0xdb).                     |
+| `0xDE` | `get_device_name`  | TX + RX   | `query_payload`         | `string_payload`        | RX payload for string response commands (device [...]  |
+| `0xDF` | `get_fw_version`   | TX + RX   | `query_payload`         | `string_payload`        | RX payload for string response commands (device [...]  |
+| `0xE0` | `get_hw_version`   | TX + RX   | `query_payload`         | `string_payload`        | RX payload for string response commands (device [...]  |
+| `0xE1` | `ready_status`     | TX + RX   | `query_payload`         | `ready_payload`         | RX payload for CMD ready_status (0xe1).                |
+| `0xE2` | `push_vin_b`       | RX        | —                       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...] |
+| `0xE3` | `push_max_current` | RX        | —                       | `float32_payload`       | Single IEEE 754 32-bit LE float (voltage in V or [...] |
+| `0xFF` | `get_full_status`  | TX + RX   | `query_payload`         | `full_status_payload`   | RX payload for CMD get_full_status (0xff) — full [...] |
+
+!!! note "Session-start magic (START=`0xb0`)"
+    Sent once after the CONNECT/READY handshake. Uses a non-standard 4-byte
+    body without CMD/LEN/CHKSUM — see `session_magic_body`.
 
 ## Payload Types
+
+### `session_magic_body`
+
+Non-standard 4-byte payload of the session-start magic frame (START=0xb0).
+
+| Field   | Type                                | Description |
+| ------- | ----------------------------------- | ----------- |
+| `magic` | fixed bytes `[0x00 0x01 0x01 0x01]` |             |
+
+### `query_payload`
+
+TX query frame payload (LEN=1, DATA=0x00).
+
+| Field      | Type | Description  |
+| ---------- | ---- | ------------ |
+| `reserved` | u8   | Always 0x00. |
 
 ### `output_enable_payload`
 
@@ -97,7 +124,7 @@ Payload for CMD connect_ctrl (0x00).
 
 ### `ready_payload`
 
-Device ready status (CMD 0xe1).
+RX payload for CMD ready_status (0xe1).
 
 | Field   | Type | Description                            |
 | ------- | ---- | -------------------------------------- |
@@ -105,7 +132,7 @@ Device ready status (CMD 0xe1).
 
 ### `string_payload`
 
-Variable-length ASCII string (no NUL terminator).
+RX payload for string response commands (device name, HW/FW version).
 
 | Field   | Type         | Description |
 | ------- | ------------ | ----------- |
@@ -121,7 +148,7 @@ Single IEEE 754 32-bit LE float (voltage in V or current in A).
 
 ### `push_output_payload`
 
-CMD 0xc3 – periodic output measurement push (LEN=12, three floats).
+RX payload for CMD push_output (0xc3) — periodic measurement push (LEN=12).
 
 | Field  | Type   | Description                                                                                             |
 | ------ | ------ | ------------------------------------------------------------------------------------------------------- |
@@ -131,7 +158,7 @@ CMD 0xc3 – periodic output measurement push (LEN=12, three floats).
 
 ### `full_status_payload`
 
-CMD 0xff – full status blob (LEN=0x8b = 139 bytes).
+RX payload for CMD get_full_status (0xff) — full status blob (LEN=0x8b = 139 bytes).
 
 | Field         | Type         | Description                                        |
 | ------------- | ------------ | -------------------------------------------------- |
@@ -171,3 +198,7 @@ CHKSUM = (CMD + LEN + Σ DATA bytes) mod 256
 
 The `DIR` and `START` bytes are **excluded** from the checksum calculation.
 Confirmed by byte-exact comparison against captured frames.
+
+## Structure Diagram
+
+![Protocol structure diagram](fnirsi_dps150.svg)

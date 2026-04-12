@@ -31,6 +31,10 @@ class FnirsiDps150(KaitaiStruct):
         disconnect = 0
         connect = 1
 
+    class Direction(IntEnum):
+        device_to_host = 240
+        host_to_device = 241
+
     class OutputState(IntEnum):
         disabled = 0
         enabled = 1
@@ -54,9 +58,222 @@ class FnirsiDps150(KaitaiStruct):
         pass
         self.frame._fetch_instances()
 
+    class CommandBody(KaitaiStruct):
+        """Standard CMD/LEN/PAYLOAD/CHKSUM body used by all non-magic frames.
+        The payload type is determined by both the direction (DIR) and the command
+        identifier (CMD): switch key = dir * 256 + cmd, so 0xf1xx = TX and 0xf0xx = RX.
+        """
+        def __init__(self, _io, _parent=None, _root=None):
+            super(FnirsiDps150.CommandBody, self).__init__(_io)
+            self._parent = _parent
+            self._root = _root
+            self._read()
+
+        def _read(self):
+            self.cmd = KaitaiStream.resolve_enum(FnirsiDps150.CommandId, self._io.read_u1())
+            self.length = self._io.read_u1()
+            _on = int(self._parent.dir) * 256 + int(self.cmd)
+            if _on == 61440:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.ConnectPayload(_io__raw_payload, self, self._root)
+            elif _on == 61632:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+            elif _on == 61633:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+            elif _on == 61634:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+            elif _on == 61635:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.PushOutputPayload(_io__raw_payload, self, self._root)
+            elif _on == 61636:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+            elif _on == 61659:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.OutputEnablePayload(_io__raw_payload, self, self._root)
+            elif _on == 61662:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.StringPayload(_io__raw_payload, self, self._root)
+            elif _on == 61663:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.StringPayload(_io__raw_payload, self, self._root)
+            elif _on == 61664:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.StringPayload(_io__raw_payload, self, self._root)
+            elif _on == 61665:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.ReadyPayload(_io__raw_payload, self, self._root)
+            elif _on == 61666:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+            elif _on == 61667:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+            elif _on == 61695:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.FullStatusPayload(_io__raw_payload, self, self._root)
+            elif _on == 61696:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.ConnectPayload(_io__raw_payload, self, self._root)
+            elif _on == 61889:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+            elif _on == 61890:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+            elif _on == 61915:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.OutputEnablePayload(_io__raw_payload, self, self._root)
+            elif _on == 61918:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.QueryPayload(_io__raw_payload, self, self._root)
+            elif _on == 61919:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.QueryPayload(_io__raw_payload, self, self._root)
+            elif _on == 61920:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.QueryPayload(_io__raw_payload, self, self._root)
+            elif _on == 61921:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.QueryPayload(_io__raw_payload, self, self._root)
+            elif _on == 61951:
+                pass
+                self._raw_payload = self._io.read_bytes(self.length)
+                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
+                self.payload = FnirsiDps150.QueryPayload(_io__raw_payload, self, self._root)
+            else:
+                pass
+                self.payload = self._io.read_bytes(self.length)
+            self.checksum = self._io.read_u1()
+
+
+        def _fetch_instances(self):
+            pass
+            _on = int(self._parent.dir) * 256 + int(self.cmd)
+            if _on == 61440:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61632:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61633:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61634:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61635:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61636:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61659:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61662:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61663:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61664:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61665:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61666:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61667:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61695:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61696:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61889:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61890:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61915:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61918:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61919:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61920:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61921:
+                pass
+                self.payload._fetch_instances()
+            elif _on == 61951:
+                pass
+                self.payload._fetch_instances()
+            else:
+                pass
+
+
     class ConnectPayload(KaitaiStruct):
         """Payload for CMD connect_ctrl (0x00).
-        DATA = 0x01 → connect, DATA = 0x00 → disconnect.
+        TX: DATA = 0x01 → connect, DATA = 0x00 → disconnect.
+        RX: device echoes the connect/disconnect state.
         """
         def __init__(self, _io, _parent=None, _root=None):
             super(FnirsiDps150.ConnectPayload, self).__init__(_io)
@@ -89,7 +306,7 @@ class FnirsiDps150(KaitaiStruct):
 
 
     class Frame(KaitaiStruct):
-        """Top-level protocol frame."""
+        """Full wire frame including direction prefix."""
         def __init__(self, _io, _parent=None, _root=None):
             super(FnirsiDps150.Frame, self).__init__(_io)
             self._parent = _parent
@@ -97,137 +314,30 @@ class FnirsiDps150(KaitaiStruct):
             self._read()
 
         def _read(self):
+            self.dir = KaitaiStream.resolve_enum(FnirsiDps150.Direction, self._io.read_u1())
             self.start = KaitaiStream.resolve_enum(FnirsiDps150.StartByte, self._io.read_u1())
-            self.cmd = KaitaiStream.resolve_enum(FnirsiDps150.CommandId, self._io.read_u1())
-            self.length = self._io.read_u1()
-            _on = self.cmd
-            if _on == FnirsiDps150.CommandId.connect_ctrl:
+            _on = self.start
+            if _on == FnirsiDps150.StartByte.start_session_magic:
                 pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.ConnectPayload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.get_device_name:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.StringPayload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.get_full_status:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.FullStatusPayload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.get_fw_version:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.StringPayload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.get_hw_version:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.StringPayload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.push_max_current:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.push_output:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.PushOutputPayload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.push_vin_a:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.push_vin_b:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.push_vin_c:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.ready_status:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.ReadyPayload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.set_current:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.set_output:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.OutputEnablePayload(_io__raw_payload, self, self._root)
-            elif _on == FnirsiDps150.CommandId.set_voltage:
-                pass
-                self._raw_payload = self._io.read_bytes(self.length)
-                _io__raw_payload = KaitaiStream(BytesIO(self._raw_payload))
-                self.payload = FnirsiDps150.Float32Payload(_io__raw_payload, self, self._root)
+                self.body = FnirsiDps150.SessionMagicBody(self._io, self, self._root)
             else:
                 pass
-                self.payload = self._io.read_bytes(self.length)
-            self.checksum = self._io.read_u1()
+                self.body = FnirsiDps150.CommandBody(self._io, self, self._root)
 
 
         def _fetch_instances(self):
             pass
-            _on = self.cmd
-            if _on == FnirsiDps150.CommandId.connect_ctrl:
+            _on = self.start
+            if _on == FnirsiDps150.StartByte.start_session_magic:
                 pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.get_device_name:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.get_full_status:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.get_fw_version:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.get_hw_version:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.push_max_current:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.push_output:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.push_vin_a:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.push_vin_b:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.push_vin_c:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.ready_status:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.set_current:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.set_output:
-                pass
-                self.payload._fetch_instances()
-            elif _on == FnirsiDps150.CommandId.set_voltage:
-                pass
-                self.payload._fetch_instances()
+                self.body._fetch_instances()
             else:
                 pass
+                self.body._fetch_instances()
 
 
     class FullStatusPayload(KaitaiStruct):
-        """CMD 0xff – full status blob (LEN=0x8b = 139 bytes).
+        """RX payload for CMD get_full_status (0xff) — full status blob (LEN=0x8b = 139 bytes).
         Offsets 0–95: 24 floats.  Offsets 96–138: mixed types (TBD).
         """
         def __init__(self, _io, _parent=None, _root=None):
@@ -268,8 +378,8 @@ class FnirsiDps150(KaitaiStruct):
 
     class OutputEnablePayload(KaitaiStruct):
         """Payload for CMD set_output (0xdb).
-        DATA = 0x01 → enable output, DATA = 0x00 → disable output.
-        The device echoes the full frame back with START = 0xa1.
+        TX: DATA = 0x01 → enable output, DATA = 0x00 → disable output.
+        RX: device echoes the full frame back with START = 0xa1.
         Confirmed from capture dps150_connect_enable_out_set_v_set_i_disable_disconnect.txt.
         """
         def __init__(self, _io, _parent=None, _root=None):
@@ -304,7 +414,8 @@ class FnirsiDps150(KaitaiStruct):
 
 
     class PushOutputPayload(KaitaiStruct):
-        """CMD 0xc3 – periodic output measurement push (LEN=12, three floats).
+        """RX payload for CMD push_output (0xc3) — periodic measurement push (LEN=12).
+        The device emits these unsolicited roughly every 600 ms during an active session.
         All values are 0.0 when output is disabled.
         """
         def __init__(self, _io, _parent=None, _root=None):
@@ -323,8 +434,29 @@ class FnirsiDps150(KaitaiStruct):
             pass
 
 
+    class QueryPayload(KaitaiStruct):
+        """TX query frame payload (LEN=1, DATA=0x00).
+        The host sends this to request a response; the device replies with a frame
+        using the same CMD code but with actual data (DIR=0xf0).
+        """
+        def __init__(self, _io, _parent=None, _root=None):
+            super(FnirsiDps150.QueryPayload, self).__init__(_io)
+            self._parent = _parent
+            self._root = _root
+            self._read()
+
+        def _read(self):
+            self.reserved = self._io.read_u1()
+
+
+        def _fetch_instances(self):
+            pass
+
+
     class ReadyPayload(KaitaiStruct):
-        """Device ready status (CMD 0xe1)."""
+        """RX payload for CMD ready_status (0xe1).
+        Device responds to a GET_READY query with this payload.
+        """
         def __init__(self, _io, _parent=None, _root=None):
             super(FnirsiDps150.ReadyPayload, self).__init__(_io)
             self._parent = _parent
@@ -339,8 +471,32 @@ class FnirsiDps150(KaitaiStruct):
             pass
 
 
+    class SessionMagicBody(KaitaiStruct):
+        """Non-standard 4-byte payload of the session-start magic frame (START=0xb0).
+        Does not follow the CMD/LEN/DATA/CHKSUM format; checksum is absent.
+        Wire (after DIR+START): 00 01 01 01 — confirmed from capture 2026-03-29.
+        Direction: TX only (host→device).
+        """
+        def __init__(self, _io, _parent=None, _root=None):
+            super(FnirsiDps150.SessionMagicBody, self).__init__(_io)
+            self._parent = _parent
+            self._root = _root
+            self._read()
+
+        def _read(self):
+            self.magic = self._io.read_bytes(4)
+            if not self.magic == b"\x00\x01\x01\x01":
+                raise kaitaistruct.ValidationNotEqualError(b"\x00\x01\x01\x01", self.magic, self._io, u"/types/session_magic_body/seq/0")
+
+
+        def _fetch_instances(self):
+            pass
+
+
     class StringPayload(KaitaiStruct):
-        """Variable-length ASCII string (no NUL terminator)."""
+        """RX payload for string response commands (device name, HW/FW version).
+        Variable-length ASCII string (no NUL terminator).
+        """
         def __init__(self, _io, _parent=None, _root=None):
             super(FnirsiDps150.StringPayload, self).__init__(_io)
             self._parent = _parent
