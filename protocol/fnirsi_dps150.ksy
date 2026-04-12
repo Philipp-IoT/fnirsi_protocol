@@ -201,20 +201,76 @@ enums:
     0xc1: connect_ctrl
 
   command_id:
-    0x00: connect_ctrl
-    0xc0: push_vin_a
-    0xc1: set_voltage
-    0xc2: set_current
-    0xc3: push_output
-    0xc4: push_vin_c
-    0xdb: set_output
-    0xde: get_device_name
-    0xdf: get_fw_version
-    0xe0: get_hw_version
-    0xe1: ready_status
-    0xe2: push_vin_b
-    0xe3: push_max_current
-    0xff: get_full_status
+    0x00:
+      id: connect_ctrl
+      doc: "Connect/disconnect control. DATA=0x01 connect, 0x00 disconnect."
+      -x-direction: host_to_device
+      -x-response: none
+    0xc0:
+      id: push_vin_a
+      doc: "Unsolicited push: input voltage channel A [V]."
+      -x-direction: device_to_host
+      -x-response: unsolicited
+    0xc1:
+      id: set_voltage
+      doc: "Set output voltage [V] as float32. Fire-and-forget."
+      -x-direction: host_to_device
+      -x-response: none
+    0xc2:
+      id: set_current
+      doc: "Set current limit [A] as float32. Fire-and-forget."
+      -x-direction: host_to_device
+      -x-response: none
+    0xc3:
+      id: push_output
+      doc: "Unsolicited push: Vout [V], Iout [A], Pout [W]."
+      -x-direction: device_to_host
+      -x-response: unsolicited
+    0xc4:
+      id: push_vin_c
+      doc: "Unsolicited push: boost rail voltage [V]."
+      -x-direction: device_to_host
+      -x-response: unsolicited
+    0xdb:
+      id: set_output
+      doc: "Enable/disable output. Device echoes the frame with START=0xa1."
+      -x-direction: host_to_device
+      -x-response: set_output
+    0xde:
+      id: get_device_name
+      doc: "Query device name. Response is ASCII string e.g. 'DPS-150'."
+      -x-direction: host_to_device
+      -x-response: get_device_name
+    0xdf:
+      id: get_fw_version
+      doc: "Query firmware version. Response is ASCII string e.g. 'V1.0'."
+      -x-direction: host_to_device
+      -x-response: get_fw_version
+    0xe0:
+      id: get_hw_version
+      doc: "Query hardware version. Response is ASCII string e.g. 'V1.2'."
+      -x-direction: host_to_device
+      -x-response: get_hw_version
+    0xe1:
+      id: ready_status
+      doc: "TX: query device ready (DATA=0x00). RX: ready=1 when device is initialized."
+      -x-direction: bidirectional
+      -x-response: ready_status
+    0xe2:
+      id: push_vin_b
+      doc: "Unsolicited push: alternate input voltage measurement [V]."
+      -x-direction: device_to_host
+      -x-response: unsolicited
+    0xe3:
+      id: push_max_current
+      doc: "Unsolicited push: device maximum current constant (5.1 A)."
+      -x-direction: device_to_host
+      -x-response: unsolicited
+    0xff:
+      id: get_full_status
+      doc: "Query full status blob. Response is 139-byte full_status_payload."
+      -x-direction: host_to_device
+      -x-response: get_full_status
 
   connect_state:
     0x00: disconnect
