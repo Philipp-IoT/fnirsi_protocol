@@ -182,7 +182,11 @@ def magic_label() -> str:
 # ---------------------------------------------------------------------------
 
 def build_dot(ksy: dict[str, Any]) -> str:
-    cmd_names: dict[int, str] = ksy.get("enums", {}).get("command_id", {})
+    raw_names: dict[int, Any] = ksy.get("enums", {}).get("command_id", {})
+    cmd_names: dict[int, str] = {
+        k: (v["id"] if isinstance(v, dict) else v)
+        for k, v in raw_names.items()
+    }
     tx_map, rx_map = payload_maps(ksy)
 
     fl = frame_label()
