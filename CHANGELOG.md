@@ -1,6 +1,49 @@
 # CHANGELOG
 
 
+## v0.2.0 (2026-04-12)
+
+### Bug Fixes
+
+- **docs**: Handle rich enum entries in gen_protocol_diagram.py
+  ([#4](https://github.com/Philipp-IoT/fnirsi_protocol/pull/4),
+  [`e132e38`](https://github.com/Philipp-IoT/fnirsi_protocol/commit/e132e38395347070955ff5645b869cada2325cbd))
+
+### Documentation
+
+- Add ARC42 architecture docs structure and ADR log (ADR-001–ADR-008)
+  ([`7ae0751`](https://github.com/Philipp-IoT/fnirsi_protocol/commit/7ae07511c045d21cd16e1493bb2eaa48f1e71b1d))
+
+Scaffolds the ARC42 template (12 sections) under docs/arc42/ and an ADR log (8 initial records)
+  under docs/adr/. All ARC42 content sections contain placeholder text per ADR-002 (human-authored
+  intent). Mermaid diagram placeholders are included in sections 3, 5, 6, and 7. The glossary (§12)
+  is pre-populated with confirmed domain terms. mkdocs.yml nav updated with two new top-level
+  sections.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
+- Add command sequence documentation with Mermaid diagrams
+  ([#3](https://github.com/Philipp-IoT/fnirsi_protocol/pull/3),
+  [`4976aba`](https://github.com/Philipp-IoT/fnirsi_protocol/commit/4976aba082e6c0864bf6efa3146b23891ffc5c64))
+
+- Add documentation section for local serving and static site build
+  ([`c5ca338`](https://github.com/Philipp-IoT/fnirsi_protocol/commit/c5ca3382c7871b870d0afe273c676ccfd178422f))
+
+- Complete architecture constraints section with detailed descriptions
+  ([`3558fcd`](https://github.com/Philipp-IoT/fnirsi_protocol/commit/3558fcd29ec3b0d59a0941b51b1d84919a666a8f))
+
+- Enhance introduction and goals section with detailed requirements and stakeholder descriptions
+  ([`4f37982`](https://github.com/Philipp-IoT/fnirsi_protocol/commit/4f379827cbc5272c9cbb26a17214ae9e61353331))
+
+- Update system scope and context with detailed stakeholder and technical diagrams
+  ([`20c9277`](https://github.com/Philipp-IoT/fnirsi_protocol/commit/20c9277a35f9843571bad64c268beacf7e874191))
+
+### Features
+
+- Include DIR in protocol definition
+  ([`1ddcf54`](https://github.com/Philipp-IoT/fnirsi_protocol/commit/1ddcf54bd2a8a72e02deb6339cbd12ded8fb75e9))
+
+
 ## v0.1.0 (2026-04-03)
 
 ### Bug Fixes
