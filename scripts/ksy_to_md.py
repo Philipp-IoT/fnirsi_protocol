@@ -58,6 +58,36 @@ def _md_table(headers: list[str], rows: list[list[str]]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Enum entry helpers (support short-form strings and long-form dicts)
+# ---------------------------------------------------------------------------
+
+
+def _enum_name(v: Any) -> str:  # noqa: ANN401
+    """Return the symbol name from a short-form string or long-form dict."""
+    if isinstance(v, dict):
+        return str(v.get("id", ""))
+    return str(v)
+
+
+def _enum_doc(v: Any) -> str:  # noqa: ANN401
+    if isinstance(v, dict):
+        return str(v.get("doc", ""))
+    return ""
+
+
+def _enum_direction(v: Any) -> str:  # noqa: ANN401
+    if isinstance(v, dict):
+        return str(v.get("-x-direction", ""))
+    return ""
+
+
+def _enum_response(v: Any) -> str:  # noqa: ANN401
+    if isinstance(v, dict):
+        return str(v.get("-x-response", ""))
+    return ""
+
+
+# ---------------------------------------------------------------------------
 # Section renderers
 # ---------------------------------------------------------------------------
 
@@ -89,14 +119,14 @@ def render_header(ksy: dict[str, Any]) -> str:
 
 
 def render_enums(ksy: dict[str, Any]) -> str:
-    enums: dict[str, dict[int, str]] = ksy.get("enums", {})
+    enums: dict[str, dict[int, Any]] = ksy.get("enums", {})
     if not enums:
         return ""
     out = ["## Enumerations", ""]
     for name, values in enums.items():
         out.append(f"### `{name}`")
         out.append("")
-        rows = [[f"`0x{v:02X}`", k] for v, k in sorted(values.items())]
+        rows = [[f"`0x{v:02X}`", _enum_name(k)] for v, k in sorted(values.items())]
         out.append(_md_table(["Value (hex)", "Name"], rows))
         out.append("")
     return "\n".join(out)
@@ -161,6 +191,16 @@ def render_commands(ksy: dict[str, Any]) -> str:
             payload_doc,
         ])
 
+    _dir_label = {
+        "host_to_device": "host → device",
+        "device_to_host": "device → host",
+        "bidirectional": "both",
+    }
+    _resp_label = {
+        "none": "—",
+        "unsolicited": "unsolicited push",
+    }
+
     out = ["## Command Catalogue", ""]
     out.append(_md_table(["CMD", "Name", "Direction", "TX Payload", "RX Payload", "Description"], rows))
     out.append("")
@@ -172,6 +212,301 @@ def render_commands(ksy: dict[str, Any]) -> str:
         "    body without CMD/LEN/CHKSUM — see `session_magic_body`.",
         "",
     ]
+
+    return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
+# Frame annotation helpers
+# ---------------------------------------------------------------------------
+
+
+def _annotate_frame(hex_str: str, payload_label: str, ksy: dict[str, Any], opaque: bool = False) -> str:
+    """Generate a tree-style byte breakdown for one wire frame.
+
+    Parameters
+    ----------
+    hex_str:
+        Full wire frame as space-separated hex bytes including the DIR prefix,
+        e.g. ``"f1 b1 c1 04 00 00 40 41 46"``.
+    payload_label:
+        Human-readable description of the DATA field, e.g. ``"float32 12.0 V"``.
+    ksy:
+        Parsed KSY dict used for enum name lookups.
+    opaque:
+        When True the checksum is marked as non-standard (start_session_magic).
+    """
+    raw = [int(b, 16) for b in hex_str.strip().split()]
+    if len(raw) < 4:
+        return hex_str
+
+    dir_b = raw[0]
+    start_b = raw[1]
+    cmd_b = raw[2]
+    len_b = raw[3]
+    data = raw[4 : 4 + len_b]
+    chk = raw[4 + len_b] if len(raw) > 4 + len_b else None
+
+    dir_str = "host → device" if dir_b == 0xF1 else "device → host"
+    prefix = "TX" if dir_b == 0xF1 else "RX"
+
+    enums = ksy.get("enums", {})
+    start_entry = enums.get("start_byte", {}).get(start_b, f"0x{start_b:02x}")
+    cmd_entry = enums.get("command_id", {}).get(cmd_b, f"0x{cmd_b:02x}")
+    start_name = _enum_name(start_entry)
+    cmd_name = _enum_name(cmd_entry)
+
+    hex_line = " ".join(f"{b:02x}" for b in raw)
+    data_hex = " ".join(f"{b:02x}" for b in data) if data else "(none)"
+
+    lines = [f"{prefix}: {hex_line}"]
+    lines.append(f"    ├─ DIR   = 0x{dir_b:02x}  ({dir_str})")
+    lines.append(f"    ├─ START = 0x{start_b:02x}  ({start_name})")
+    lines.append(f"    ├─ CMD   = 0x{cmd_b:02x}  ({cmd_name})")
+    lines.append(f"    ├─ LEN   = {len_b}")
+
+    data_line = f"    ├─ DATA  = {data_hex}"
+    if payload_label:
+        data_line += f"  →  {payload_label}"
+    lines.append(data_line)
+
+    if chk is not None:
+        if opaque:
+            lines.append(f"    └─ CHK   = 0x{chk:02x}  (non-standard — send as opaque constant)")
+        else:
+            parts = " + ".join(f"0x{b:02x}" for b in data) if data else "0"
+            formula = f"(0x{cmd_b:02x} + {len_b} + {parts}) mod 256"
+            lines.append(f"    └─ CHK   = 0x{chk:02x}  (= {formula})")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Sequence renderers
+# ---------------------------------------------------------------------------
+
+
+def _mermaid_for_sequence(seq: dict[str, Any], ksy: dict[str, Any]) -> list[str]:
+    """Generate a Mermaid sequenceDiagram for one sequence.
+
+    When a step has an ``example`` block the hex bytes are used as the message
+    label so the diagram shows the actual wire data.
+    """
+    steps: list[dict[str, Any]] = seq.get("steps", [])
+    lines = [
+        "```mermaid",
+        "sequenceDiagram",
+        "    participant H as Host",
+        "    participant D as DPS-150",
+    ]
+
+    for step in steps:
+        direction = step.get("direction", "")
+        ex: dict[str, Any] = step.get("example", {})
+        ex_label = str(ex.get("label", "")).strip()
+
+        if direction == "delay":
+            ms = step.get("ms", "?")
+            lines.append(f"    Note over H: Wait {ms} ms")
+            continue
+
+        retry = step.get("retry")
+        resp = step.get("response")
+        cmd_name = str(step.get("cmd", step.get("raw_hex", "?")))
+
+        # Build TX message: prefer example hex bytes, fall back to name+payload
+        if ex.get("tx"):
+            tx_bytes = " ".join(ex["tx"].strip().split())
+            tx_msg = f"[TX] {cmd_name}: {tx_bytes}"
+        else:
+            payload = str(step.get("payload", "")).strip()
+            tx_msg = f"[TX] {cmd_name}: {payload}" if payload else f"[TX] {cmd_name}"
+
+        # Build RX message
+        if ex.get("rx"):
+            rx_bytes_raw: str = ex["rx"]
+            if ex.get("rx_truncated"):
+                rx_bytes = rx_bytes_raw.rstrip() + " ..."
+            else:
+                rx_bytes = " ".join(rx_bytes_raw.strip().split())
+            rx_msg = f"[RX] {cmd_name}: {rx_bytes}"
+        else:
+            rx_msg = None
+            if isinstance(resp, dict):
+                resp_cmd = resp.get("cmd", cmd_name)
+                resp_cond = resp.get("condition", "")
+                rx_msg = f"[RX] {resp_cmd}" + (f" ({resp_cond})" if resp_cond else "")
+
+        if retry:
+            max_r = retry.get("max", "?")
+            delay_r = retry.get("delay_ms", "?")
+            lines.append(f"    loop up to {max_r}× / {delay_r} ms")
+            lines.append(f"        H->>D: {tx_msg}")
+            if rx_msg:
+                lines.append(f"        D-->>H: {rx_msg}")
+            lines.append("    end")
+            if ex_label:
+                lines.append(f"    Note over H,D: {ex_label}")
+        elif direction == "tx":
+            lines.append(f"    H->>D: {tx_msg}")
+            if rx_msg:
+                lines.append(f"    D-->>H: {rx_msg}")
+            if ex_label:
+                lines.append(f"    Note over H,D: {ex_label}")
+        elif direction == "rx":
+            if ex.get("rx"):
+                lines.append(f"    D-->>H: {rx_msg}")
+            if ex_label:
+                lines.append(f"    Note over H,D: {ex_label}")
+
+    lines.append("```")
+    return lines
+
+
+def _annotations_for_sequence(seq: dict[str, Any], ksy: dict[str, Any]) -> list[str]:
+    """Generate annotated byte-breakdown code blocks for each step with an example."""
+    steps: list[dict[str, Any]] = seq.get("steps", [])
+    out: list[str] = []
+
+    for step in steps:
+        ex: dict[str, Any] = step.get("example", {})
+        if not ex:
+            continue
+        direction = step.get("direction", "")
+        if direction == "delay":
+            continue
+
+        ex_label = str(ex.get("label", "")).strip()
+        opaque = bool(ex.get("opaque"))
+        blocks: list[str] = []
+
+        if ex.get("tx"):
+            blocks.append(_annotate_frame(ex["tx"], ex_label, ksy, opaque=opaque))
+
+        if ex.get("rx") and not ex.get("rx_truncated"):
+            rx_payload_label = str(ex.get("rx_label") or ex.get("label", "")).strip()
+            blocks.append(_annotate_frame(ex["rx"], rx_payload_label, ksy))
+        elif ex.get("rx") and ex.get("rx_truncated"):
+            # Show only the RX header and note truncation
+            rx_hex = ex["rx"].strip()
+            out_rx = f"RX: {rx_hex}  (truncated — {ex.get('rx_label', '')})"
+            blocks.append(out_rx)
+
+        if blocks:
+            out.append("```")
+            out.append("\n".join(blocks))
+            out.append("```")
+            out.append("")
+
+    return out
+
+
+def _render_one_sequence(seq: dict[str, Any], ksy: dict[str, Any]) -> list[str]:
+    """Render one sequence: Mermaid diagram, byte annotations, step table."""
+    seq_id = seq.get("id", "unknown")
+    doc = textwrap.dedent(str(seq.get("doc", ""))).strip()
+    steps: list[dict[str, Any]] = seq.get("steps", [])
+
+    out = [f"#### `{seq_id}`", ""]
+    if doc:
+        out.append(doc)
+        out.append("")
+
+    # Mermaid diagram with hex byte labels
+    out += _mermaid_for_sequence(seq, ksy)
+    out.append("")
+
+    # Annotated byte breakdowns
+    out += _annotations_for_sequence(seq, ksy)
+
+    # Step table
+    rows = []
+    for step in steps:
+        direction = step.get("direction", "")
+        step_num = str(step.get("step", ""))
+        note = str(step.get("note", "")).replace("\n", " ").strip()
+
+        if direction == "delay":
+            rows.append([step_num, "delay", "—", f"{step.get('ms', '?')} ms", "—", note])
+            continue
+
+        cmd = str(step.get("cmd", step.get("raw_hex", "—")))
+        payload = str(step.get("payload", step.get("raw_hex", "—"))).strip()
+
+        retry = step.get("retry")
+        retry_str = ""
+        if retry:
+            retry_str = f" (retry ×{retry.get('max', '?')} / {retry.get('delay_ms', '?')} ms)"
+
+        resp = step.get("response", "none")
+        if resp == "none" or resp is None:
+            resp_str = "—"
+        elif isinstance(resp, dict):
+            resp_cmd = resp.get("cmd", "")
+            cond = resp.get("condition", "")
+            extra = f" — {cond}" if cond else ""
+            resp_str = f"`{resp_cmd}`{extra}"
+        else:
+            resp_str = str(resp)
+
+        dir_symbol = {
+            "tx": "host → device",
+            "rx": "device → host",
+        }.get(direction, direction)
+
+        interval = step.get("interval_ms")
+        interval_str = f" (~{interval} ms)" if interval else ""
+
+        rows.append([
+            step_num,
+            dir_symbol,
+            f"`{cmd}`",
+            payload + retry_str + interval_str,
+            resp_str,
+            note,
+        ])
+
+    out.append(_md_table(["Step", "Direction", "CMD", "Payload / timing", "Response", "Notes"], rows))
+    out.append("")
+    return out
+
+
+def render_sequences(ksy: dict[str, Any]) -> str:
+    sequences: list[dict[str, Any]] = ksy.get("sequences", [])
+    if not sequences:
+        return ""
+
+    # Group by phase, preserving order
+    phase_order = ["connect", "active", "disconnect"]
+    phases: dict[str, list[dict[str, Any]]] = {p: [] for p in phase_order}
+    for seq in sequences:
+        phase = seq.get("phase", "active")
+        phases.setdefault(phase, []).append(seq)
+
+    phase_titles = {
+        "connect": "Connection Handshake",
+        "active": "Active Session",
+        "disconnect": "Disconnection",
+    }
+
+    out = [
+        "## Command Sequences",
+        "",
+        "!!! info \"Source\"",
+        "    Sequence data is defined in `protocol/sequences.yaml` and auto-generated here.",
+        "    For narrative context, timing diagrams, and wire-level examples",
+        "    see [Session Lifecycle](session.md).",
+        "",
+    ]
+
+    for phase_key in phase_order:
+        phase_seqs = phases.get(phase_key, [])
+        if not phase_seqs:
+            continue
+        out.append(f"### {phase_titles.get(phase_key, phase_key.title())}")
+        out.append("")
+        for seq in phase_seqs:
+            out += _render_one_sequence(seq, ksy)
 
     return "\n".join(out)
 
@@ -261,23 +596,45 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("--ksy", required=True, type=Path, help="Path to .ksy file")
+    p.add_argument(
+        "--sequences",
+        type=Path,
+        default=None,
+        help=(
+            "Path to sequences.yaml (default: <ksy-dir>/sequences.yaml). "
+            "Defines command/response sequences; auto-discovered alongside --ksy."
+        ),
+    )
     p.add_argument("--out", required=True, type=Path, help="Output Markdown file")
     return p.parse_args()
 
 
-def load_ksy(path: Path) -> dict[str, Any]:
+def load_yaml(path: Path) -> dict[str, Any]:
     with path.open() as f:
         return yaml.safe_load(f)  # type: ignore[no-any-return]
 
 
 def main() -> None:
     args = parse_args()
-    ksy = load_ksy(args.ksy)
+    ksy = load_yaml(args.ksy)
+
+    # Auto-discover sequences.yaml next to the KSY file if not specified
+    seq_path: Path = args.sequences or args.ksy.parent / "sequences.yaml"
+    sequences: list[dict[str, Any]] = []
+    if seq_path.exists():
+        seq_data = load_yaml(seq_path)
+        sequences = seq_data.get("sequences", [])
+    else:
+        print(f"Note: sequences file not found at {seq_path}, skipping Command Sequences section.")
+
+    # Inject sequences into ksy dict so render_sequences() can find them
+    ksy["sequences"] = sequences
 
     sections = [
         render_header(ksy),
         render_enums(ksy),
         render_commands(ksy),
+        render_sequences(ksy),
         render_types(ksy),
         render_checksum(),
         render_diagram(),

@@ -4,6 +4,13 @@ This document describes the complete communication sequence between the host
 and the FNIRSI DPS-150 power supply, from connection establishment through
 operation to disconnection.
 
+!!! tip "Machine-readable sequence data"
+    The structured per-command sequence definitions (request / response / retry
+    parameters) are defined in `protocol/sequences.yaml` and auto-generated into
+    [Protocol Reference → Command Sequences](reference.md#command-sequences).
+    This page provides the narrative context, Mermaid diagrams, and
+    wire-level annotated examples.
+
 !!! info "Source"
     All sequences confirmed from captures
     `dps150_connect_set_10v_set_1A_disconnect.txt` and
@@ -149,37 +156,6 @@ TX: f1  c1 00 01 00 01
 ```
 
 After disconnect, the serial port is closed. No response is expected.
-
----
-
-## Timing Diagram
-
-```mermaid
-gantt
-    title Session Timeline
-    dateFormat X
-    axisFormat %s
-
-    section Handshake
-    CONNECT frame           :a1, 0, 1
-    GET_READY poll          :a2, 2, 3
-    START_SESSION magic     :a3, 3, 4
-
-    section Push Stream
-    PUSH_VIN_A              :b1, 5, 6
-    PUSH_OUTPUT             :b2, 5, 6
-    PUSH_VIN_B              :b3, 5, 6
-    PUSH_VIN_A              :b4, 11, 12
-    PUSH_OUTPUT             :b5, 11, 12
-
-    section Host Commands
-    SET_VOLTAGE 12.0V       :c1, 7, 8
-    SET_CURRENT 1.0A        :c2, 8, 9
-    SET_OUTPUT enable       :c3, 9, 10
-
-    section Teardown
-    DISCONNECT              :d1, 15, 16
-```
 
 ---
 
