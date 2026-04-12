@@ -107,7 +107,10 @@ class DPS150:
         for attempt in range(_READY_RETRIES):
             self._send(protocol.encode_query(protocol.Cmd.GET_READY))
             parsed = self._recv()
-            if parsed.frame.cmd == protocol.Cmd.GET_READY and parsed.frame.payload.ready == 1:
+            if (
+                parsed.frame.body.cmd == protocol.Cmd.GET_READY
+                and parsed.frame.body.payload.ready == 1
+            ):
                 log.info("Device ready (attempt %d)", attempt + 1)
                 break
             log.debug("Not yet ready (attempt %d), retrying…", attempt + 1)
@@ -117,7 +120,7 @@ class DPS150:
                 f"Device did not become ready after {_READY_RETRIES} GET_READY polls"
             )
 
-        self._conn.write(protocol.START_SESSION_MAGIC)
+        self._conn.write(protocol.encode_session_magic())
         log.debug("START_SESSION magic sent")
 
     def _disconnect(self) -> None:
@@ -169,12 +172,12 @@ class DPS150:
         Call this in a loop to get a live measurement stream.
         """
         parsed = self._recv()
-        if parsed.frame.cmd != protocol.Cmd.PUSH_OUTPUT:
+        if parsed.frame.body.cmd != protocol.Cmd.PUSH_OUTPUT:
             raise ProtocolError(
                 f"Expected PUSH_OUTPUT (0x{protocol.Cmd.PUSH_OUTPUT:02X}), "
-                f"got 0x{parsed.frame.cmd:02X}"
+                f"got 0x{parsed.frame.body.cmd:02X}"
             )
-        p = parsed.frame.payload
+        p = parsed.frame.body.payload
         return PushOutput(vout_v=float(p.vout), iout_a=float(p.iout), pout_w=float(p.pout))
 
     # ------------------------------------------------------------------
@@ -197,7 +200,7 @@ class DPS150:
 
 def _parse_status(parsed: Any) -> DeviceStatus:
     """Extract DeviceStatus from a GET_FULL_STATUS Kaitai frame object."""
-    p = parsed.frame.payload
+    p = parsed.frame.body.payload
     return DeviceStatus(
         voltage_set_v=float(p.vset),
         current_set_a=float(p.iset),
