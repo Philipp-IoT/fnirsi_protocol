@@ -32,6 +32,7 @@ dev = [
   "mypy>=1.10",
   "types-pyserial",
   "python-semantic-release>=9",
+  "pyyaml>=6",
 ]
 docs = [
   "mkdocs-material>=9",
